@@ -1,0 +1,164 @@
+TAROT AI 提示词与输出规范（替换版）
+
+specVersion: 1.0.0
+
+目标
+- 让 AI 仅输出单个 JSON，对齐统一 schema，避免任何字段缺失或额外文本。
+- 前端可据此进行强校验与自动纠偏，适配 web / iOS / Android。
+
+使用方式
+- 将“系统提示词（可直接复制）”作为系统/开发者指令使用。
+- 将“输入 JSON 模板”填充为请求体传给 AI。
+- 收到响应后，用“严格校验规则”进行检测，不合格时用“纠偏提示”再次请求补齐。
+
+系统提示词（可直接复制）
+```
+你是塔罗解析助手。只允许输出一个且仅一个 JSON 对象，必须符合下述输出 schema。不得输出任何说明文字、Markdown、代码块、空行或额外键。
+
+通用规则（MUST）：
+- 输出为单个 JSON 对象；不得换行插入文本；不得省略任何要求的键。
+- 若无可用值，用 null 或空字符串填充，但必须保留该键。
+- `cards.length === spread.cardsCount`；每个 `positionIndex` 唯一且与 `spread.positions` 一一对应。
+- 小阿尔卡纳：必须给出 `suit` 与 `rank`；大阿尔卡纳：`suit=null`、`rank=null`。
+- 每张牌至少含 `meaningShort`、`keywords`≥2、`advice`≥1。
+- 仅返回 JSON；不输出“以下是结果”“解析如下”等文字。
+```
+
+输入 JSON 模板（前端→AI）
+```
+{
+  "userIntent": "tarot_reading",
+  "locale": "zh-CN",
+  "scenarioId": "love_today",
+  "question": "我今天的恋爱运势如何？",
+  "spread": {
+    "id": "three_shadow_light_path",
+    "name": "影-光-路",
+    "cardsCount": 3,
+    "positions": ["影","光","路"]
+  },
+  "deckOverrides": {
+    "frontImageDefault": "/assets/cards/front-default.png",
+    "backImageDefault": "/assets/cards/back-default.png"
+  },
+  "constraints": {
+    "mustReturnAllFields": true,
+    "maxTokens": 1200
+  }
+}
+```
+
+输出 JSON Schema（AI→前端，必须包含所有键）
+```
+{
+  "meta": {
+    "specVersion": "1.0.0",
+    "timestamp": "YYYY-MM-DDThh:mm:ssZ",
+    "locale": "zh-CN"
+  },
+  "questionAnalysis": {
+    "summary": "string",
+    "keywords": ["string", "string"]
+  },
+  "spread": {
+    "id": "string",
+    "name": "string",
+    "cardsCount": 1,
+    "positions": ["string", "string", "..."]
+  },
+  "cards": [
+    {
+      "positionIndex": 0,
+      "positionName": "string",
+      "cardId": "string",
+      "majorMinor": "major|minor",
+      "name": "string",
+      "suit": "Wands|Cups|Swords|Pentacles|null",
+      "rank": "Ace|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Page|Knight|Queen|King|null",
+      "upright": true,
+      "rotation": 0,
+      "meaningShort": "string",
+      "meaningLong": "string",
+      "keywords": ["string", "string"],
+      "advice": "string",
+      "imageFront": "/assets/cards/front-default.png",
+      "imageBack": "/assets/cards/back-default.png"
+    }
+  ],
+  "summary": "string",
+  "actionables": [{ "label": "string", "type": "insert_to_chat" }],
+  "confidence": 0.8,
+  "errors": []
+}
+```
+
+严格校验规则（MUST）
+- 返回体必须是合法 JSON；无多余文本或缺失键。
+- `cards.length === spread.cardsCount`；`positionIndex` 连续且唯一。
+- 每张牌必须包含：`name`、`majorMinor`、`upright`、`meaningShort`、`keywords`(≥2)、`advice`(≥1)。
+- 当 `majorMinor = minor`：`suit` 与 `rank` 不得为 null；当 `majorMinor = major`：`suit=null`、`rank=null`。
+- `confidence` ∈ [0,1]；`errors` 为数组（可为空）。
+
+逐牌抽取（交互与数据产出）
+- 每次抽取产出：`positionIndex`、`positionName`、`cardId`、`name`、`suit`、`rank`、`majorMinor`、`upright`、`rotation`、`meaningShort`。
+- 事件与状态：`onPick(positionIndex, card)` → 更新 `DrawState.picked`；`DrawState = { picked: [...], remaining }`。
+- 校验：`picked.length === spread.cardsCount`；每个 `positionIndex` 仅允许一张；`upright` 必填；`rotation` 合法。
+- 边界：允许当位重选（可选）；“重置牌阵”清空 `DrawState` 并回到抽取前。
+
+纠偏提示（用于补齐缺失字段的二次请求）
+```
+只返回 JSON，对照上次输出补齐缺失键并保持原有值不变：
+- 保留所有已有键与值；仅为缺失的键补充 null 或合理值。
+- `cards` 长度与 `spread.cardsCount` 一致；每张牌至少 2 个 `keywords` 与 1 条 `advice`。
+- 不得输出任何解释文字或 Markdown。
+```
+
+塔罗数据字典（枚举）
+- 大阿尔卡纳（0–21）
+  0 愚者 The Fool
+  1 魔术师 The Magician
+  2 女祭司 The High Priestess
+  3 女皇 The Empress
+  4 皇帝 The Emperor
+  5 教皇 The Hierophant
+  6 恋人 The Lovers
+  7 战车 The Chariot
+  8 力量 Strength
+  9 隐士 The Hermit
+  10 命运之轮 Wheel of Fortune
+  11 正义 Justice
+  12 倒吊人 The Hanged Man
+  13 死神 Death
+  14 节制 Temperance
+  15 恶魔 The Devil
+  16 高塔 The Tower
+  17 星星 The Star
+  18 月亮 The Moon
+  19 太阳 The Sun
+  20 审判 Judgement
+  21 世界 The World
+
+- 小阿尔卡纳花色：权杖 Wands / 圣杯 Cups / 宝剑 Swords / 星币 Pentacles
+- 小阿尔卡纳序列：Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Page, Knight, Queen, King
+
+示例响应（节选，影-光-路）
+```
+{
+  "meta": { "specVersion": "1.0.0", "timestamp": "2025-11-03T09:00:00Z", "locale": "zh-CN" },
+  "questionAnalysis": { "summary": "围绕情感的转化与选择", "keywords": ["转化","选择"] },
+  "spread": { "id": "three_shadow_light_path", "name": "影-光-路", "cardsCount": 3, "positions": ["影","光","路"] },
+  "cards": [
+    { "positionIndex": 0, "positionName": "影", "cardId": "major_13", "majorMinor": "major", "name": "死神", "suit": null, "rank": null, "upright": false, "rotation": -12, "meaningShort": "阶段结束带来重生", "meaningLong": "旧有模式需要放下，以迎接新关系的可能", "keywords": ["结束","转化"], "advice": "先完成旧事，把空间腾出来", "imageFront": "/assets/cards/front-default.png", "imageBack": "/assets/cards/back-default.png" },
+    { "positionIndex": 1, "positionName": "光", "cardId": "major_6", "majorMinor": "major", "name": "恋人", "suit": null, "rank": null, "upright": true, "rotation": 0, "meaningShort": "亲密与选择", "meaningLong": "以真诚沟通做出互惠选择", "keywords": ["亲密","选择"], "advice": "表达真实需求，避免暧昧不清" },
+    { "positionIndex": 2, "positionName": "路", "cardId": "cups_page", "majorMinor": "minor", "name": "圣杯侍者", "suit": "Cups", "rank": "Page", "upright": true, "rotation": 5, "meaningShort": "情感学习与敏感", "meaningLong": "以开放心态体验新的互动态", "keywords": ["学习","敏感"], "advice": "主动倾听，建立健康边界" }
+  ],
+  "summary": "从结束到选择与学习，关系迎来新可能。",
+  "actionables": [{ "label": "插入聊天", "type": "insert_to_chat" }],
+  "confidence": 0.84,
+  "errors": []
+}
+```
+
+版本与维护
+- 若需扩展字段，请保持后向兼容：新增键只能追加，禁止重命名或删除现有键。
+- 前端校验器可据“严格校验规则”快速定位问题，并触发“纠偏提示”再请求。

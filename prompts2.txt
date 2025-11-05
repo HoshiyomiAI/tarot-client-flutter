@@ -1,0 +1,222 @@
+前端完整项目生成提示词（Flutter，一次性产出）
+
+目标
+- 让你一次性输出“可运行的完整前端项目”全部文件内容，严格遵循本文的架构、文件清单与行为规范；只输出项目文件，不输出任何说明文字。
+
+技术栈与版本（统一为 Flutter）
+- Flutter ^3.x、Dart ^3.x。
+- 包：go_router（底部标签+Stack/ShellRoute）、hooks_riverpod/riverpod、flutter_hooks、shared_preferences、flutter_secure_storage、intl、animations、cupertino_icons、flutter_svg、cached_network_image、connectivity_plus。
+- 仅使用原生组件与自定义样式；不引入重量级第三方 UI 框架。
+
+文件块输出格式（MUST）
+- 每个文件以行首写：`*** File: <path>`；下一行开始为文件内容；相邻文件之间用一个空行分隔；禁止使用 Markdown 代码块或任何解释文字。
+
+目录结构（必须完整生成）
+- 根：`pubspec.yaml`、`analysis_options.yaml`、`README.md`。
+- `lib/`：`main.dart`、`app.dart`、`router.dart`、`screens/`、`widgets/`、`state/`、`services/`、`models/`、`theme/`、`utils/`。
+- `assets/`：`cards/`（front-default.png、back-default.png 占位）、`images/`（夜空等占位）、`icons/`。
+
+输出顺序（MUST）
+- 从 `pubspec.yaml` 开始；随后 `analysis_options.yaml`；然后按“流程驱动模块顺序”输出 `lib/` 内文件；最后 `README.md` 与 `assets` 占位说明。
+
+流程驱动模块顺序（MUST，严格按以下顺序输出文件块）
+1) 基础配置：`lib/app.dart`、`lib/router.dart`（ShellRoute Tabs: Home/Chat/Profile；Stack: Calendar/Settings/Detail）。
+2) 主题与令牌：`lib/theme/tokens.dart`、`lib/theme/styles.dart`。
+3) 首页（Home）骨架与交互：`lib/screens/home.dart`（英雄区/今日运势卡/占卜仪式/学习区，含打开抽卡的入口）。
+4) 抽卡浮窗 Step1：`lib/widgets/draw_modal/step1_question.dart`。
+5) 抽卡浮窗 Step2：`lib/widgets/draw_modal/step2_pick.dart`（洗牌/横向牌堆/长按翻面）。
+6) 抽卡浮窗 Step3：`lib/widgets/draw_modal/step3_sequence.dart`（依 positions 逐牌抽取）。
+7) 抽卡浮窗 Step4：`lib/widgets/draw_modal/step4_summary.dart`（插入聊天/返回/重新抽取）。
+8) 聊天页：`lib/screens/chat.dart` 与 `lib/widgets/message_bubble.dart`、`lib/widgets/card_preview.dart`。
+9) 日历页：`lib/screens/calendar.dart`（月视图与详情卡）。
+10) 个人中心与设置：`lib/screens/profile.dart`、`lib/screens/settings.dart`。
+11) 状态与模型：`lib/state/*`、`lib/models/*`（与 prompts.txt 对齐）。
+12) 服务与工具：`lib/services/mock_api.dart`、`lib/utils/*`。
+
+说明：若某文件名不同但语义一致，可在同模块内按上述顺序输出，不得改变整体顺序。
+
+页面范围
+- 底部导航三页：`/chat`（左）、`/home`（中）、`/profile`（右）。
+- 子页：`/settings`（从 Profile 进入）、`/calendar`（Home 下滑进入，下落动画）。
+- 抽卡动画组件为全局浮窗，可在 Home/Chat 调起；支持洗牌、逐牌抽取、插入聊天。
+
+实现与行为要求（摘要，结合原型）
+- SafeArea、字体、触控热区、阴影统一；遵循 iOS 规范，同时保证 Android/Web 行为近似。
+- 主页：中心塔罗牌显示区（点击打开抽卡浮窗）、情景列表（进入预设牌阵与问题）。
+- 抽卡浮窗四步：问题与分析→洗牌与选牌→逐牌抽取→结果汇总；提供“插入聊天/返回/重新抽取”。
+- 聊天页：文本消息与卡片消息混排；工具按钮可再次调起抽卡浮窗。
+- 日历页：显示当日状态与历史；未登录/无操作/有操作三态；切换日期刷新。
+- 个人中心：登录/注册/退出；设置页更换卡面图片（正/反面）与主题（白天/夜间）。
+
+数据模型与 Mock 要求
+- 类型对齐：TarotCard、DeckConfig、Scenario、Spread、ChatMessage、CalendarLog、UserProfile、ThemeConfig。
+- Mock API 返回体必须与 `prompts.txt` schema 对齐；`draw.drawCards` 返回影-光-路或时间流等；含正/逆位与简义。
+
+主题与样式
+- 夜间模式降低明度与饱和度，提升对比与可读性。
+
+UI 主题令牌（必须实现）
+- 颜色：
+  - `colors.bgDeep` = `#151224`（深夜紫黑）
+  - `colors.bgSoft` = `#1B1730`
+  - `colors.gold` = `#E5C08B`
+  - `colors.accent` = `#8A7AE6`
+  - `colors.muted` = `#7A718F`
+- 渐变：
+  - `gradients.nightSky` = [ `#1B1730`, `#231A3F`, `#2C214D` ]
+  - `gradients.card` = [ `#201A36`, `#2A2146` ]
+- Chat 气泡：用户气泡金色渐变与圆角 16；系统气泡紫黑背景与圆角 16；尾巴可省略。
+- TabBar：五栏图标与文字使用金色/灰色，中央抽卡为金色高亮并放大 1.25x。
+
+原型一致性检查清单（MUST）
+- 底部导航显示“首页/占卜/抽卡/学习/我的”，中央抽卡加大与高亮。
+- 首页顶部夜空视觉与欢迎语；今日运势卡含日期、主牌图与四维度胶囊进度；配色接近原型（紫黑+金）。
+- 日历页头部显示年份与月份，月视图含三态图标；详情卡含问题与三张卡缩略图及“查看详细解读”。
+- 聊天页气泡样式与配色接近原型；卡片消息展示三张卡缩略与摘要；输入区带占位与发送按钮。
+- 抽卡流程四步与进度圆点可见；洗牌与选牌动画存在；结果页提供“插入聊天/返回/重新抽取”。
+- 主题与令牌满足深色紫黑+金色视觉；缺图时使用渐变占位，不崩溃。
+
+生成规则（MUST）
+- 仅输出文件块；每个文件内容完整、可直接写入磁盘；禁止“略”。
+- 代码需通过 `flutter analyze`；`dart format` 建议但不强制。
+- 资源缺失时代码必须优雅降级，不因图片不存在而崩溃。
+
+功能流程详解（参考原型图，必须实现）
+
+主页（Home）
+- 顶部英雄区：
+  - 显示“今日塔罗指引”标题、欢迎语（带昵称/头像占位）、夜空背景图（默认渐变+微光纹理）。
+  - 右上角状态按钮：网络状态/设置入口（进入 Settings）。
+  - 加载策略：先显示骨架，完成后淡入真实内容；失败时显示重试按钮。
+- 今日运势卡：
+  - 左侧主卡：展示今日主牌（图/名称/简义），支持点击查看详情；无图显示渐变占位。
+  - 右上日期：显示“YYYY年MM月DD日”，可点击进入 Calendar 对应日期。
+  - 下方维度指示：爱情/事业/财运/命运四项，使用胶囊/进度条；点击切换高亮并更新简要文案。
+  - 交互：主卡点击→打开抽卡浮窗（预设问题“今日指引”，可选单牌/三牌）。
+  - 下滑动作：从英雄区或主卡区域下拉超过阈值→Calendar 以顶部下落动画出现；也可点击日期直接进入。
+- 占卜仪式区：
+  - 四宫格卡片：爱情占卜、事业占卜、财商占卜、命运占卜；每张卡含图标、简介、按钮。
+  - 点击进入抽卡浮窗，注入对应默认问题与牌阵；完成后跳转 Chat 并插入卡片消息。
+  - 顶部“查看全部”进入情景列表。
+- 学习区：
+  - 卡片展示当前课程与进度条（例：22 张大阿尔卡纳解读，进度 3/12）。
+  - CTA “继续学习”进入课程详情（可用占位页面）。
+  - 无课程时显示“加入入门课程”占位与添加按钮。
+- 底部导航常驻显示；中间 Home 标签权重最高。
+ - 底部导航样式与顺序（MUST）：顺序为“对话｜主页｜我的”；中间“主页”为金色圆形主按钮并带外发光，其余两侧为圆形细描边与轻微外发光；点击切换并保持当前状态高亮。
+
+日历（Calendar）
+- 头部：显示年份与月份（例：2023年10月），前后月份切换；设置进入 Settings；返回按钮回到 Home。
+- 月视图：每日格含日期与状态图标（未登录/无操作/有操作）。点击某日更新下方详情卡；同日不重复请求（缓存）。
+- 当日详情卡：展示“今日塔罗指引”摘要与三张卡缩略，含“查看详细解读”；支持“已解读”角标；空数据显示“今日暂无记录”与“去抽卡”。
+
+聊天（Chat）
+- 消息流：系统欢迎语（塔罗智者）→用户文本→AI/卡片消息→继续对话；卡片消息包含三张卡缩略、位置名、简义，点击展开详情（页内弹层或跳转详情页）。
+- 输入区：占位“输入你的问题...”；发送文本后插入用户消息并触发 mock/AI 解析返回系统消息；工具按钮“抽卡”调起抽卡浮窗；完成后作为卡片消息插入并自动滚动。
+- 边界与错误：未登录提示登录；允许访客模式但不持久化历史；网络失败显示重试；卡片消息插入失败提示“插入失败，可重试”。
+
+抽卡浮窗（DrawModal）
+- 步骤1：问题与分析；顶部关闭、进度圆点（4）、更多；内容含问题输入、问题分析（mock）、牌阵推荐（影-光-路/时间流/单牌/自定义）与“更多牌阵”；主按钮“继续”。
+- 步骤2：抽牌准备与选择；标题显示当前牌阵与“更换牌阵”；提示文案“Tap to pick your card”；可“洗牌”触发轻量 reanimated 动画；横向牌堆点击选牌；长按翻面预览；选中后卡片飞出停到当前位，显示正/逆位与简义；支持撤销重选（可选）。
+- 步骤3：按 `positions` 顺序逐牌抽取；确认后出现“下一张/继续”；实时 DrawState：`{ picked: [{positionIndex, cardId, upright}], remaining }`；校验每个 positionIndex 唯一、`upright` 必填。
+- 步骤4：结果汇总；展示位置、正/逆位、关键含义与解析（mock）；“插入聊天/返回主页/重新抽取”。
+- 视觉与动效：水彩渐变与柔光；卡片微动效与光晕；夜间模式降低明度与饱和度。
+ - 外发光（MUST）：所有可点击卡片、主按钮、“继续/下一张”按钮、卡片缩略与浮窗边缘均启用外发光；按下态光强减弱、禁用态移除；在深色背景上采用金色主光（Primary），卡面预览允许次光（Secondary）。
+
+流程事件与状态规范（MUST）
+- Home：
+  - `onOpenDrawModal()` → 显示 DrawModal。
+  - `onOpenCalendar(date)` → 跳转 Calendar 指定日期。
+  - `onPullDownCalendar()` → 侦测到首页下滑阈值后，以下落转场进入 Calendar。
+- DrawModal：
+  - Step1：`onContinueStep1(question, spread)`；允许 question 为空但给出轻提示。
+  - Step2：`onShuffle()`、`onPick(card)`、`onPreview(card, upright)`；`onCancelPick()` 可选。
+  - Step3：`onConfirm(positionIndex, card, upright, rotation)`；`onResetSpread()` 重置回 Step2。
+  - Step4：`onInsertToChat(result)` 跳转 Chat 并插入卡片消息；`onBackHome()`；`onRedraw()`。
+- Chat：
+  - `onSendText(text)` → 插入用户消息并触发 `services.sendMessage`；
+  - `onOpenDrawModal()` → 再次抽卡。
+- Calendar：
+  - `onSelectDay(day)` → 更新详情卡；`onOpenDetail()` → 结果详情（可复用 Step4 布局）。
+- Settings：
+  - `onChangeTheme(mode)` 持久化到 SharedPreferences；`onReplaceDeckImages(front, back)` 写入 DeckConfig。
+
+状态流（MUST，与 Riverpod 对齐）
+- `DeckState = { spread, picked: [{positionIndex, cardId, upright, rotation}], remaining }`。
+- `ThemeState = { mode: dark|light, tokens }`；`AuthState = { user|null, token|null }`；`ChatState = { messages: [] }`；`CalendarState = { selectedDay, logsByDay }`。
+- 初始化：本地读取 → 并发 `mock_api` → 合并更新；失败保留骨架与缓存。
+
+个人中心（Profile）与设置（Settings）
+- Profile：显示头像/用户名/邮箱；登录/注册/退出；已登录显示进入 Settings 的入口。
+- Settings：卡面样式替换（正/反面图片选择、预览与保存到 DeckConfig）；主题切换（白天/夜间，即时应用并持久化到 SharedPreferences）；清理缓存、关于与版本信息。
+
+状态管理与持久化
+- Riverpod 切片：Theme、Deck、Auth、Chat；关键数据写入 SharedPreferences；令牌写入 flutter_secure_storage。
+- 初始加载：先读本地存储→并发请求 mock 数据→合并更新；失败使用占位与重试。
+
+API 与数据约束（与 prompts.txt 对齐）
+- Mock API：`scenarios`、`draw`、`calendar`、`auth`、`chat`、`settings`；响应必须符合 prompts.txt 的 JSON Schema。
+- 抽卡结果：保证 `cards.length === spread.cardsCount`；每张卡含正/逆位与简义；详解字段按规范补齐。
+
+错误与离线处理
+- 网络错误：展示 Toast 与重试；页面保留骨架与本地缓存。
+- 离线模式：读取最近一次数据，界面可浏览；插入聊天延迟到上线后同步。
+
+无障碍与国际化（简要）
+- 文本与按钮支持可访问性标签；触控热区≥44pt；暗色对比度达标。
+- 文案基于中文；预留 i18n 结构（可留空占位）。
+
+模型定义（必须输出 `lib/models/*`）
+- `tarot_card.dart`、`spread.dart`、`scenario.dart`、`chat_message.dart`、`calendar_log.dart`、`user_profile.dart`、`theme_config.dart` 等核心模型；字段与 prompts.txt 一致。
+
+state（必须输出 `lib/state/*`）
+- `theme_providers.dart`：主题令牌、切换与持久化。
+- `deck_providers.dart`：卡面替换、当前牌阵与抽取状态。
+- `auth_providers.dart`：登录状态、访客模式与令牌。
+- `chat_providers.dart`：消息列表、插入卡片消息方法与持久化。
+
+services（必须输出 `lib/services/mock_api.dart`）
+- 提供 `getScenarios()`、`analyzeQuestion()`、`drawCards(spread)`、`getCalendar(day)`、`sendMessage(text)` 等方法；返回数据严格符合 prompts.txt；内部用 `Future` + `Future.delayed` 模拟网络与失败场景。
+
+组件（必须输出）
+- `DrawModal`：四步流程与动画；`CardPreview`：卡片缩略与正/逆位；`MessageBubble`：聊天气泡；`TodayCard`：首页主牌卡。
+ - 所有可操作元素（按钮、卡片、标签、列表项、切换、Tab、Chip、浮窗、底部导航激活项）必须应用统一外发光样式 `styles.outerGlow(...)`，并在按下/禁用态做强度与颜色衰减。
+ - `BottomNav`：自定义底部导航组件，顺序“对话｜主页｜我的”；中间“主页”为金色圆形主按钮，左右为描边圆；提供 `currentIndex` 与 `onTap(index)`；在 ShellRoute 中作为统一导航容器。
+
+主题与样式（必须输出 `lib/theme/tokens.dart` 与 `lib/theme/styles.dart`）
+- 包含颜色、渐变、阴影、圆角与字体大小；导出常用样式与装饰工具。
+ - 外发光令牌（MUST）：
+   - `glowColorPrimary`：`#FFD57A`（金色，A=0.35，暗色提高到0.45）。
+   - `glowColorSecondary`：`#9E83FF`（紫金混合光，A=0.30）。
+   - `glowBlurSmall`：8；`glowBlurMedium`：16；`glowBlurLarge`：28。
+   - `glowSpreadSmall`：1；`glowSpreadMedium`：2；`glowSpreadLarge`：4。
+   - `glowPressedScale`：0.8（按下态整体强度系数）；`glowDisabledScale`：0.0（禁用态无光）。
+ - 样式方法（MUST）：
+   - `outerGlow({Color? color, double? blur, double? spread, double? opacity})` 返回 `List<BoxShadow>` 或 `Decoration`；默认值取 tokens 的 Primary + Medium；暗色模式自动提升不透明度并降低背景明度避免过曝。
+   - `glowForState(WidgetState state)`：根据 `idle/hover/focus/pressed/disabled` 返回不同强度；`hover|focus` 使用 `Large`，`pressed` 使用 `Medium * glowPressedScale`。
+ - 使用规范：
+   - 卡片与按钮使用 `AnimatedContainer` 或 `Material`/`Card` 搭配 `BoxShadow`；悬停与焦点通过 `MouseRegion` 与 `Focus`/`InkWell` 触发强度变化。
+   - 底部导航激活项与浮窗边缘需有柔和外发光，并与圆角、渐变保持一致（紫黑背景上金色光环）。
+
+工具（必须输出 `lib/utils/*`）
+- `date.dart`：日期格式化；`layout.dart`：尺寸与安全区；`persist.dart`：SharedPreferences 封装。
+
+导航（必须输出 `lib/router.dart`）
+- 使用 go_router：ShellRoute 构建底部标签页（Home/Chat/Profile）；额外路由：Calendar、Settings、Detail。
+ - Calendar 使用自定义转场：`CustomTransitionPage` + `SlideTransition`，起始 `Offset(0,-1)` → `Offset.zero`（从顶部下落）；返回时从 `Offset.zero` → `Offset(0,-1)` 上推。
+ - 底部导航（MUST）：
+   - 顺序固定为 Chat（对话）｜Home（主页）｜Profile（我的）。
+   - 交互事件：`onTapTab(index)`；路由映射：`0→/chat`、`1→/home`、`2→/profile`。
+   - 视觉：中间 Home 使用金色渐变圆形按钮（直径 56–64），`outerGlow(Large)`；左右两侧为 44–48 直径圆形细描边与 `outerGlow(Small)`；标签文字在下方，选中为金色，未选中为紫灰。
+   - 安全区与背景：底部留 SafeArea，背景暗紫（`#1A1724`）。
+
+测试与运行（写入 README）
+- 安装依赖：`flutter pub get`；运行：`flutter run`（iOS/Android/Web）。
+- 验证：能够完成抽卡四步、插入聊天、切换主题、浏览日历与登录退出；夜间主题视觉与原型一致。
+
+验收标准（MUST）
+- 项目能在 Flutter 运行；无 Dart/分析报错；主要用户流程完整；UI 令牌与原型一致；离线与失败场景不崩溃。
+ - 样式验收：所有可操作元素（按钮、卡片、Tab、Chip、列表项、浮窗与导航激活项）均呈现外发光；悬停/焦点增强、按下衰减、禁用关闭；暗色模式外发光不刺眼且与紫黑金主题一致。
+
+输出开始
+- 立即以“文件块格式”输出完整项目的全部文件内容；从 `pubspec.yaml` 开始，依次给出配置文件、页面与组件、state、services、models、utils、theme、router、README 与 assets 占位说明。

@@ -1,0 +1,28 @@
+# Normalize line endings across the repo
+* text=auto eol=lf
+
+# Keep Windows scripts as CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files (no EOL conversion)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.keystore binary
+*.jks binary
+*.aab binary
+*.apk binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.7z binary
+*.mp3 binary
+*.mp4 binary
+*.mov binary

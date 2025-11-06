@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
+import 'package:flutter/physics.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// 抽卡弹窗（占位版）：用于确定布局与大致位置，无实际功能
 class DrawModal {
@@ -10,6 +12,7 @@ class DrawModal {
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
+      enableDrag: false,
       barrierColor: Colors.black.withOpacity(0.45),
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -65,14 +68,22 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
 
   bool get _allRevealed => _revealed.every((v) => v);
 
+  @override
+  void initState() {
+    super.initState();
+    // 每次进入页面：打乱底部牌堆顺序
+    _deckFaces.shuffle(math.Random());
+  }
+
   // 从牌堆中选择一张牌，按顺序填充到上半部分的下一个空卡位
-  void _pickFromDeck(_Face face) {
+  bool _pickFromDeck(_Face face) {
     final int nextIndex = _pickedFaces.indexWhere((f) => f == null);
-    if (nextIndex == -1) return; // 已填满
+    if (nextIndex == -1) return false; // 已填满，拒绝继续抽
     setState(() {
       _pickedFaces[nextIndex] = face;
       _revealed[nextIndex] = true;
     });
+    return true; // 接受本次抽牌
   }
 
   // 在第一页选择牌阵后，更新当前选择并重置第二页的状态
@@ -240,49 +251,55 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
   Widget _buildStep2(BuildContext context, double spacingScale) {
     final theme = Theme.of(context);
     final text = theme.textTheme;
-    final opened = _pickedFaces.where((f) => f != null).length;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8 * spacingScale),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: _SectionCard(
-              title: _selectedSpread.title,
-              expandChild: true,
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 牌阵卡槽区（参考设计图，固定高度）
-                    SizedBox(
-                      height: 220,
-                      child: _SpreadSlotsView(
-                          spread: _selectedSpread, slots: _pickedFaces),
-                    ),
-                    SizedBox(height: 12 * spacingScale),
-                    Center(
-                        child: Text('Tap to pick your card',
-                            style: text.bodyMedium)),
-                    const SizedBox(height: 6),
-                    const Icon(Icons.favorite_border, size: 18),
-                    SizedBox(height: 12 * spacingScale),
-                    // 横向牌堆（参考设计图）
-                    SizedBox(
-                      height: 180,
-                      child: _PickDeckStrip(
-                        faces: _deckFaces,
-                        onPick: _pickFromDeck,
-                      ),
-                    ),
-                  ],
+            flex: 2,
+            child: Column(
+              children: [
+                SizedBox(height: 20 * spacingScale),
+                Text(
+                  'Tap to pick your card',
+                  style: text.titleMedium
+                      ?.copyWith(color: Colors.white.withOpacity(0.8)),
                 ),
-              ),
+                SizedBox(height: 8 * spacingScale),
+                Container(
+                  width: 100,
+                  height: 1,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+                SizedBox(height: 20 * spacingScale),
+                Expanded(
+                  child: _SpreadSlotsView(
+                      spread: _selectedSpread, slots: _pickedFaces),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 10 * spacingScale),
-          Text('已选：$opened/${_selectedSpread.cards}', style: text.bodyMedium),
+          Expanded(
+            flex: 3,
+            child: Column(
+              children: [
+                SizedBox(height: 10 * spacingScale),
+                Text(
+                  'Drag to move',
+                  style: text.bodyMedium
+                      ?.copyWith(color: Colors.white.withOpacity(0.8)),
+                ),
+                SizedBox(height: 20 * spacingScale),
+                Expanded(
+                  child: _PickDeckStrip(
+                    faces: _deckFaces,
+                    onPick: _pickFromDeck,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -298,39 +315,32 @@ class _Face {
 }
 
 List<_Face> _buildMockDeckFaces() {
-  const labels = [
-    '山景',
-    '猫咪',
-    '海岸',
-    '森林',
-    '星空',
-    '湖泊',
-    '城市',
-    '花朵',
-    '沙漠',
-    '河流',
-    '雪地',
-    '田野'
+  // 78 张塔罗牌：22 张大阿尔卡纳 + 56 张小阿尔卡纳（四花色×14）
+  final List<String> majors = [
+    '愚者', '魔术师', '女祭司', '皇后', '皇帝', '教皇', '恋人', '战车', '力量', '隐者',
+    '命运之轮', '正义', '倒吊人', '死神', '节制', '恶魔', '高塔', '星星', '月亮', '太阳', '审判', '世界'
   ];
-  const colors = [
-    Colors.blueGrey,
-    Colors.deepPurple,
-    Colors.teal,
-    Colors.indigo,
-    Colors.brown,
-    Colors.orange,
-    Colors.pink,
-    Colors.cyan,
-    Colors.green,
-    Colors.amber,
-    Colors.red,
-    Colors.lightBlue,
+  final List<String> suits = ['权杖', '圣杯', '宝剑', '星币'];
+  final List<String> ranks = [
+    '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '侍者', '骑士', '皇后', '国王'
   ];
-  return List.generate(labels.length, (i) {
-    // 使用 Picsum 提供的示例图片，若加载失败将回退到渐变背景
+
+  // 生成小阿尔卡纳名称
+  final List<String> minors = [
+    for (final suit in suits)
+      for (final rank in ranks) '$suit$rank'
+  ];
+
+  final List<String> names = [...majors, ...minors];
+  // 为每张牌生成颜色（保持原有 HSL 渐变），和占位图片 URL（暂不使用）
+  final int totalCards = names.length; // 78
+  final List<Color> colors = List.generate(
+      totalCards,
+      (i) => HSLColor.fromAHSL(1.0, (i * 360.0 / totalCards) % 360, 0.5, 0.6)
+          .toColor());
+  return List.generate(totalCards, (i) {
     final url = 'https://picsum.photos/seed/${i + 1}/400/640';
-    return _Face(
-        color: colors[i % colors.length], label: labels[i], imageUrl: url);
+    return _Face(color: colors[i], label: names[i], imageUrl: url);
   });
 }
 
@@ -348,7 +358,6 @@ class _SpreadSlotsView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
       ),
-      clipBehavior: Clip.hardEdge,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final positions = _positionsForSpread(spread);
@@ -358,16 +367,16 @@ class _SpreadSlotsView extends StatelessWidget {
           // 自适应卡槽尺寸（随卡数缩放）
           double slotWidth;
           if (n <= 3) {
-            slotWidth = 94;
-          } else if (n <= 5) {
             slotWidth = 78;
-          } else if (n <= 8) {
+          } else if (n <= 5) {
             slotWidth = 64;
+          } else if (n <= 8) {
+            slotWidth = 54;
           } else {
-            slotWidth = 56;
+            slotWidth = 48;
           }
-          // 正常卡牌比例：width / height ≈ 0.62，因此 height = width / 0.62
-          final double slotHeight = slotWidth / 0.62;
+          // 正常卡牌比例：width / height ≈ 0.7，因此 height = width / 0.7
+          final double slotHeight = slotWidth / 0.7;
           final int len = math.min(positions.length, slots.length);
           // 当位置数与卡位数不一致时，优先绘制有效范围，其余补空槽
           return Stack(
@@ -438,6 +447,8 @@ class _EmptySlot extends StatelessWidget {
     );
   }
 }
+
+
 
 class _FaceCard extends StatelessWidget {
   final _Face face;
@@ -526,47 +537,37 @@ class _FaceCard extends StatelessWidget {
 // 下半部分：横向牌堆，点击将卡面填充到上方卡位
 class _PickDeckStrip extends StatefulWidget {
   final List<_Face> faces;
-  final void Function(_Face face) onPick;
+  final bool Function(_Face face) onPick; // 返回是否接受本次抽牌
   const _PickDeckStrip({required this.faces, required this.onPick});
 
   @override
   State<_PickDeckStrip> createState() => _PickDeckStripState();
 }
 
-class _PickDeckStripState extends State<_PickDeckStrip> {
-  late final ScrollController _controller;
-  bool _offsetInitialized = false;
-  _Face? _centerFace; // 记录当前最中心的牌
-  int? _centerFaceIndex; // 记录当前最中心牌的索引
-  final Set<int> _revealedFaceIndices = {}; // 记录已翻开的牌的索引
-
-  // 为实现"无限循环"，将卡组重复到一个很大的数量
-  static const int _repeatMultiplier = 5000; // 适度的大，避免过长构建
-  int get _virtualCount => widget.faces.length * _repeatMultiplier;
-
-  // 更新当前最中心的牌
-  void _updateCenterFace(double itemExtent) {
-    if (!_controller.hasClients) return;
-
-    // 计算当前视口中心位置对应的卡片索引
-    final double viewportCenter =
-        _controller.offset + _controller.position.viewportDimension / 2;
-    final int centerCardIndex = (viewportCenter / itemExtent).round().toInt();
-
-    // 确保索引在有效范围内
-    final int effectiveIndex = centerCardIndex % widget.faces.length;
-
-    // 更新最中心的牌和索引
-    setState(() {
-      _centerFace = widget.faces[effectiveIndex];
-      _centerFaceIndex = effectiveIndex;
-    });
-  }
+class _PickDeckStripState extends State<_PickDeckStrip>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  double _rotationAngle = 0.0;
+  late List<bool> _revealed;
+  late List<bool> _reversed; // 每张牌的正位/逆位状态（true=逆位）
+  late List<int?> _drawOrder; // 每张牌的抽取顺序（第几张），未抽为 null
+  int _acceptedCount = 0; // 已接受的抽牌数量
+  // Removed dedicated picked index; use revealed state to persist highlight/offset.
 
   @override
   void initState() {
     super.initState();
-    _controller = ScrollController();
+    _controller = AnimationController.unbounded(vsync: this)
+      ..addListener(() {
+        setState(() {
+          _rotationAngle = _controller.value;
+        });
+      });
+    _revealed = List<bool>.filled(widget.faces.length, false, growable: false);
+    // 每次进入页面随机正逆位（预先确定，点击后不再改变）
+    final rand = math.Random();
+    _reversed = List<bool>.generate(widget.faces.length, (_) => rand.nextBool(), growable: false);
+    _drawOrder = List<int?>.filled(widget.faces.length, null, growable: false);
   }
 
   @override
@@ -577,186 +578,156 @@ class _PickDeckStripState extends State<_PickDeckStrip> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final double deckHeight = constraints.maxHeight;
-      // 卡牌尺寸：遵循标准塔罗卡比例（宽高比约为0.62），并预留顶部的弧形下沉空间
-      final double cardHeight = deckHeight * 0.82;
-      final double cardWidth = cardHeight * 0.62;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // --- 2D Arc Geometry centered below horizontal middle ---
+        const cardWidth = 100.0;
+        const cardHeight = 160.0;
+        final int numCards = widget.faces.length;
+        final double centerX = constraints.maxWidth / 2;
+        final double centerY = constraints.maxHeight * 1.45; // move circle further down
+        final double radius = constraints.maxWidth * 0.90; // larger radius for looser spacing and wider rotation
+        // Wider sweep to increase spacing between cards along the arc
+        final double sweepAngle = math.pi * 1.5;
+        // Top-of-circle baseline so the arc sits above the center (concave up)
+        const double theta0 = -math.pi / 2;
+        // Limit rotation so at least a portion (minCoverageRatio) of horizontal width shows cards
+        final double width = constraints.maxWidth;
+        final double beta = sweepAngle / 2;
+        // Linear limit: allow rotation up to a fraction of half-sweep
+        const double minCoverageRatio = 0.10; // keep at least 10% horizontal coverage
+        final double phiLimit = ((1.0 - minCoverageRatio) * beta).clamp(0.0, math.pi * 2);
 
-      // 为了实现重叠与弧形效果，主轴宽度设置为小于卡牌宽度的 itemExtent
-      // 这样相邻卡会互相覆盖（叠在一起），产生扇形效果
-      // 调整这个值可以控制卡牌的重叠程度，使视觉效果更佳
-      final double itemExtent = cardWidth * 0.7; // 增大重叠比例，使卡牌排列更紧密但不至于过于拥挤
-      // 在轻微弧线基础上略微增大弧度
-      final double radius =
-          math.max(deckHeight * 3.2, constraints.maxWidth * 1.8);
-      // 调整曲率因子，使弧形效果更自然
-      const double curvatureFactor = 0.25; // 适当减小曲率，使卡牌排列更平缓自然
+        return GestureDetector(
+          onPanStart: (details) {
+            _controller.stop();
+          },
+          onPanUpdate: (details) {
+            setState(() {
+              // Increase sensitivity to expand the effective drag range
+              final double delta = details.delta.dx / (radius * 0.6);
+              final double next = _rotationAngle + delta;
+              // Clamp to keep at least half the horizontal width covered by cards
+              _rotationAngle = next.clamp(-phiLimit, phiLimit);
+              _controller.value = _rotationAngle; // keep controller in sync
+            });
+          },
+          onPanEnd: (details) {
+            // Remove rebound/snap: keep the angle at release without animation.
+            _controller.stop();
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: () {
+              final List<Widget> cardChildren = [];
+              final List<Widget> labelChildren = []; // 确保标签在所有卡片之上渲染
+              for (int index = 0; index < numCards; index++) {
+                const double pickOffset = 18.0; // outward movement for revealed (selected) cards
+                final double progress = index / (numCards - 1);
+                final double theta = theta0 + (progress - 0.5) * sweepAngle + _rotationAngle;
+                final bool isRevealed = _revealed[index];
+                final double localRadius = radius + (isRevealed ? pickOffset : 0.0);
+                final double x = centerX + localRadius * math.cos(theta);
+                final double y = centerY + localRadius * math.sin(theta);
 
-      // 初次构建时，将滚动位置跳到“中点”，制造无限循环的体验
-      if (!_offsetInitialized) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_controller.hasClients) return;
-          final double midOffset = (_virtualCount / 2) * itemExtent;
-          // 调整偏移量，使中心卡片位于屏幕中心
-          final double adjustedOffset =
-              midOffset - constraints.maxWidth / 2 + itemExtent / 2;
-          final double clamped =
-              adjustedOffset.clamp(0.0, _controller.position.maxScrollExtent);
-          _controller.jumpTo(clamped);
-          _offsetInitialized = true;
+                // 卡片主体
+                cardChildren.add(Positioned(
+                  left: x - cardWidth / 2,
+                  top: y - cardHeight / 2,
+                  child: Transform(
+                    transform: Matrix4.identity()..rotateZ(theta - math.pi / 2),
+                    alignment: FractionalOffset.center,
+                    child: _ArcDeckCard(
+                      face: widget.faces[index],
+                      width: cardWidth,
+                      height: cardHeight,
+                      onTap: () {
+                        if (!isRevealed) {
+                          final bool accepted = widget.onPick(widget.faces[index]);
+                          if (accepted) {
+                            setState(() {
+                              _revealed[index] = true;
+                              _drawOrder[index] = _acceptedCount + 1;
+                              _acceptedCount++;
+                            });
+                          }
+                        }
+                      },
+                      highlight: isRevealed,
+                      isRevealed: isRevealed,
+                    ),
+                  ),
+                ));
 
-          // 初始化中心牌
-          _updateCenterFace(itemExtent);
-        });
-      }
+                // 翻开后在更外层圆环上显示卡名与正逆位（圆形排列）
+                if (isRevealed) {
+                  final bool reversed = _reversed[index];
+                  final String orientationText = reversed ? '逆位' : '正位';
+                  final int? order = _drawOrder[index];
+                  final String orderText = order == null ? '' : '第${order}张 · ';
+                  final String labelText = '$orderText${widget.faces[index].label} · $orientationText';
+                  // 更外层圆环：从卡片外沿向外扩展，半径更大
+                  const double ringMargin = 40.0; // 与卡片边缘的额外间距
+                  const double labelWidth = 150.0;
+                  const double labelHeight = 34.0;
+                  final double outerR = localRadius + cardHeight / 2 + ringMargin; // 外层圆环半径
+                  final double lx = centerX + outerR * math.cos(theta);
+                  final double ly = centerY + outerR * math.sin(theta);
 
-      return NotificationListener<ScrollNotification>(
-        onNotification: (notif) {
-          if (!_controller.hasClients) return false;
-
-          // 处理滚动结束事件，确保档位切换和居中显示
-          if (notif is ScrollEndNotification) {
-            // 更新最中心的牌
-            _updateCenterFace(itemExtent);
-            return true;
-          }
-
-          return false;
-        },
-        child: Scrollbar(
-          controller: _controller,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _controller,
-            scrollDirection: Axis.horizontal,
-            physics: _SnapScrollPhysics(
-                itemExtent: itemExtent,
-                viewportWidth: constraints.maxWidth),
-            child: Row(
-              children: List.generate(_virtualCount, (index) {
-                final _Face face = widget.faces[index % widget.faces.length];
-                return SizedBox(
-                  width: itemExtent,
-                  child: AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, _) {
-                      // 缓存常用计算，减少重复计算
-                      final double viewportCenter =
-                          (_controller.hasClients ? _controller.offset : 0) +
-                              constraints.maxWidth / 2;
-                      final double itemCenter =
-                          index * itemExtent + itemExtent / 2;
-                      final double dx = itemCenter - viewportCenter;
-
-                      // 简化计算，只在需要时计算复杂值
-                      final bool isCenter = (dx.abs() < itemExtent / 2);
-                      // 调整中心卡牌的放大和提升效果，使其更加突出
-                      final double scale = isCenter ? 1.1 : 1.0; // 增大放大比例
-                      final double lift =
-                          isCenter ? -cardHeight * 0.15 : 0.0; // 增大提升幅度
-
-                      // 只对可见区域附近的卡片进行复杂计算
-                      if (dx.abs() > constraints.maxWidth) {
-                        return Center(
-                          child: Transform.translate(
-                            offset: Offset(0, lift),
-                            child: Transform.scale(
-                              scale: scale,
-                              child: _ArcDeckCard(
-                                face: face,
-                                width: cardWidth,
-                                height: cardHeight,
-                                onTap: () {
-                                  // 使用记录的最中心的牌，而不是当前点击的牌
-                                  if (_centerFace != null &&
-                                      _centerFaceIndex != null) {
-                                    // 检查这张牌是否已经翻开
-                                    if (!_revealedFaceIndices
-                                        .contains(_centerFaceIndex!)) {
-                                      // 标记为已翻开
-                                      setState(() {
-                                        _revealedFaceIndices
-                                            .add(_centerFaceIndex!);
-                                      });
-                                      // 触发回调
-                                      widget.onPick(_centerFace!);
-                                    }
-                                  }
-                                },
-                                highlight: isCenter,
-                                isRevealed: _revealedFaceIndices
-                                    .contains(index % widget.faces.length),
+                  labelChildren.add(Positioned(
+                    left: lx - labelWidth / 2,
+                    top: ly - labelHeight / 2,
+                    child: IgnorePointer(
+                      child: Transform(
+                        // 将文字方向反转（在切线方向上旋转 180°）
+                        transform: Matrix4.identity()..rotateZ(theta + math.pi / 2),
+                        alignment: FractionalOffset.center,
+                        child: Container(
+                          width: labelWidth,
+                          height: labelHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.35)),
+                            // 背景颜色与卡牌颜色一致（纯色）
+                            color: widget.faces[index].color,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.20),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 2),
                               ),
-                            ),
+                            ],
                           ),
-                        );
-                      }
-
-                      // 对可见区域的卡片进行完整计算
-                      final double centerIndexExact =
-                          (viewportCenter - itemExtent / 2) / itemExtent;
-                      final int centerIndex = centerIndexExact.round();
-                      final double r = radius;
-                      final double clampedDx = dx.clamp(-r + 1, r - 1);
-                      double dropY = (r -
-                              math.sqrt(math.max(
-                                  0.0, r * r - clampedDx * clampedDx))) *
-                          curvatureFactor;
-                      // 钳制垂直位移，确保不越出可视区域（牌堆高度内）
-                      final double allowedDown =
-                          math.max(0.0, (deckHeight - cardHeight) / 2 - 2);
-                      dropY = dropY.clamp(0.0, allowedDown);
-                      // 调整倾斜角度计算，使其更符合弧形排列的视觉效果
-                      final double angle =
-                          (clampedDx / r) * 0.18; // 增大倾斜角度，使卡牌更贴合弧形
-
-                      return Center(
-                        child: Transform.translate(
-                          offset: Offset(0, dropY + lift),
-                          child: Transform.scale(
-                            scale: scale,
-                            child: Transform.rotate(
-                              angle: angle,
-                              alignment: Alignment.center, // 确保以卡牌自身为中心旋转
-                              child: _ArcDeckCard(
-                                face: face,
-                                width: cardWidth,
-                                height: cardHeight,
-                                onTap: () {
-                                  // 使用记录的最中心的牌，而不是当前点击的牌
-                                  if (_centerFace != null &&
-                                      _centerFaceIndex != null) {
-                                    // 检查这张牌是否已经翻开
-                                    if (!_revealedFaceIndices
-                                        .contains(_centerFaceIndex!)) {
-                                      // 标记为已翻开
-                                      setState(() {
-                                        _revealedFaceIndices
-                                            .add(_centerFaceIndex!);
-                                      });
-                                      // 触发回调
-                                      widget.onPick(_centerFace!);
-                                    }
-                                  }
-                                },
-                                highlight: isCenter,
-                                isRevealed: _revealedFaceIndices
-                                    .contains(index % widget.faces.length),
-                              ),
+                          child: Center(
+                            child: Text(
+                              labelText,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Colors.white, // 文字颜色为白色
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                );
-              }),
-            ),
+                      ),
+                    ),
+                  ));
+                }
+              }
+              // 先渲染卡片，再渲染外层标签，确保标签层级更外
+              return [
+                ...cardChildren,
+                ...labelChildren,
+              ];
+            }(),
           ),
-        ),
-      );
-    });
+
+        );
+      },
+    );
   }
 }
 
@@ -764,9 +735,10 @@ class _ArcDeckCard extends StatelessWidget {
   final _Face face;
   final double width;
   final double height;
-  final VoidCallback onTap;
   final bool highlight;
   final bool isRevealed;
+  final VoidCallback? onTap;
+
   const _ArcDeckCard(
       {required this.face,
       required this.width,
@@ -786,8 +758,7 @@ class _ArcDeckCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
+            border:                Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
             boxShadow: [
               // 增强基础阴影效果，使其更具立体感
               BoxShadow(
@@ -820,67 +791,27 @@ class _ArcDeckCard extends StatelessWidget {
                 ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAliasWithSaveLayer,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 根据是否已翻开显示不同的内容
-                isRevealed
-                    ? Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              face.color.withOpacity(0.85),
-                              face.color.withOpacity(0.55)
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(face.label,
-                              style: Theme.of(context).textTheme.labelSmall),
-                        ),
-                      )
-                    : const _TarotCardBack(),
-                if (highlight && !isRevealed)
-                  Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text('选择',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(color: Colors.white)),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 根据是否已翻开显示不同的内容
+              if (!isRevealed)
+                const _TarotCardBack()
+              else
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    // 去除半透明，使用卡牌纯色背景
+                    color: face.color,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      face.label,
+                      style: theme.textTheme.labelSmall,
                     ),
                   ),
-                if (isRevealed)
-                  Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text('已翻开',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(color: Colors.white)),
-                    ),
-                  ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -888,137 +819,16 @@ class _ArcDeckCard extends StatelessWidget {
   }
 }
 
-// 更符合塔罗风格的卡背（深紫金色、中心星徽与双层金边）
 class _TarotCardBack extends StatelessWidget {
   const _TarotCardBack();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final Color gold =
-        Color.lerp(Colors.amber, theme.colorScheme.primary, 0.15)!
-            .withOpacity(0.95);
-    final Color deep1 = const Color(0xFF160B2C); // 深紫
-    final Color deep2 = const Color(0xFF0D071B); // 更深紫
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0.0, -0.05),
-          radius: 0.95,
-          colors: [deep1, deep2],
-          stops: const [0.2, 1.0],
-        ),
-      ),
-      child: CustomPaint(
-        painter: _TarotBackPainter(gold: gold),
-      ),
+    return SvgPicture.asset(
+      'assets/images/tarot_back.svg',
+      fit: BoxFit.fill,
     );
   }
-}
-
-class _TarotBackPainter extends CustomPainter {
-  final Color gold;
-  _TarotBackPainter({required this.gold});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    // 外层与内层金边
-    final outer =
-        RRect.fromRectAndRadius(rect.deflate(1.2), const Radius.circular(12));
-    final inner =
-        RRect.fromRectAndRadius(rect.deflate(8), const Radius.circular(10));
-    final outerPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..color = gold;
-    final innerPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..color = gold.withOpacity(0.7);
-    canvas.drawRRect(outer, outerPaint);
-    canvas.drawRRect(inner, innerPaint);
-
-    // 角饰花纹（轻微金色曲线）
-    final deco = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3
-      ..color = gold.withOpacity(0.45);
-    // 左上
-    final p1 = Path()
-      ..moveTo(10, 22)
-      ..quadraticBezierTo(size.width * 0.18, 8, size.width * 0.34, 24)
-      ..quadraticBezierTo(size.width * 0.22, 18, size.width * 0.18, 28);
-    canvas.drawPath(p1, deco);
-    // 右上
-    final p2 = Path()
-      ..moveTo(size.width - 10, 22)
-      ..quadraticBezierTo(size.width * 0.82, 8, size.width * 0.66, 24)
-      ..quadraticBezierTo(size.width * 0.78, 18, size.width * 0.82, 28);
-    canvas.drawPath(p2, deco);
-    // 左下
-    final p3 = Path()
-      ..moveTo(10, size.height - 22)
-      ..quadraticBezierTo(size.width * 0.18, size.height - 8, size.width * 0.34,
-          size.height - 24)
-      ..quadraticBezierTo(size.width * 0.22, size.height - 18,
-          size.width * 0.18, size.height - 28);
-    canvas.drawPath(p3, deco);
-    // 右下
-    final p4 = Path()
-      ..moveTo(size.width - 10, size.height - 22)
-      ..quadraticBezierTo(size.width * 0.82, size.height - 8, size.width * 0.66,
-          size.height - 24)
-      ..quadraticBezierTo(size.width * 0.78, size.height - 18,
-          size.width * 0.82, size.height - 28);
-    canvas.drawPath(p4, deco);
-
-    // 中心星徽与环圈
-    final center = Offset(size.width / 2, size.height / 2);
-    final outerR = size.width * 0.18;
-    final innerR = outerR * 0.45;
-    final ringPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..color = gold.withOpacity(0.7);
-    canvas.drawCircle(center, outerR * 1.18, ringPaint);
-    final starStroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = gold;
-    final star = _buildStarPath(center, outerR, innerR, 5);
-    canvas.drawPath(star, starStroke);
-
-    // 星环微光点缀
-    final dotPaint = Paint()..color = gold.withOpacity(0.6);
-    for (int t = 0; t < 20; t++) {
-      final a = (2 * math.pi * t) / 20;
-      final pos = center + Offset(math.cos(a), math.sin(a)) * (outerR * 1.18);
-      canvas.drawCircle(pos, 0.9, dotPaint);
-    }
-  }
-
-  Path _buildStarPath(Offset c, double outerR, double innerR, int points) {
-    final path = Path();
-    final step = math.pi / points; // 半步用于内外交替
-    for (int i = 0; i < points * 2; i++) {
-      final isOuter = i.isEven;
-      final r = isOuter ? outerR : innerR;
-      final a = -math.pi / 2 + i * step; // 从正上方开始
-      final x = c.dx + r * math.cos(a);
-      final y = c.dy + r * math.sin(a);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SectionCard extends StatelessWidget {
@@ -1646,32 +1456,6 @@ class _DotsPlaceholder extends StatelessWidget {
           ),
         );
       }),
-    );
-  }
-}
-
-class _BoxPlaceholder extends StatelessWidget {
-  final double height;
-  final String label;
-  const _BoxPlaceholder({required this.height, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.3)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.7),
-        ),
-      ),
     );
   }
 }

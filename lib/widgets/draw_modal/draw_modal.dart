@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 /// 抽卡弹窗（占位版）：用于确定布局与大致位置，无实际功能
 class DrawModal {
@@ -58,7 +59,8 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
   _SpreadMock _selectedSpread = _mockSpreads.first; // 可变：支持在第一页选择牌阵
   List<bool> _revealed = List<bool>.filled(_mockSpreads.first.cards, false);
   // Step2：按所选牌阵的卡位进行抽取，记录已选卡面
-  late List<_Face?> _pickedFaces = List<_Face?>.filled(_selectedSpread.cards, null);
+  late List<_Face?> _pickedFaces =
+      List<_Face?>.filled(_selectedSpread.cards, null);
   final List<_Face> _deckFaces = _buildMockDeckFaces();
 
   bool get _allRevealed => _revealed.every((v) => v);
@@ -113,7 +115,10 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
             topRight: Radius.circular(24),
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, spreadRadius: 4),
+            BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 20,
+                spreadRadius: 4),
           ],
         ),
         child: SafeArea(
@@ -124,7 +129,8 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                 children: [
                   // 顶部栏：关闭 + 进度点 + 设置占位
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8 * spacingScale),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8 * spacingScale),
                     child: Row(
                       children: [
                         IconButton(
@@ -133,7 +139,8 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                         ),
                         Expanded(
                           child: Center(
-                            child: _DotsPlaceholder(count: 3, activeIndex: _step),
+                            child:
+                                _DotsPlaceholder(count: 3, activeIndex: _step),
                           ),
                         ),
                         IconButton(
@@ -148,7 +155,9 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                   Expanded(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 220),
-                      child: _step == 0 ? _buildStep1(context, spacingScale) : _buildStep2(context, spacingScale),
+                      child: _step == 0
+                          ? _buildStep1(context, spacingScale)
+                          : _buildStep2(context, spacingScale),
                     ),
                   ),
 
@@ -186,12 +195,19 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8 * spacingScale),
+          padding:
+              EdgeInsets.symmetric(horizontal: 16, vertical: 8 * spacingScale),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              _SectionCard(title: '问题', child: const _QuestionMock(), paddingScale: spacingScale),
+              _SectionCard(
+                  title: '问题',
+                  child: const _QuestionMock(),
+                  paddingScale: spacingScale),
               SizedBox(height: 16 * spacingScale),
-              _SectionCard(title: '问题分析', child: const _AnalysisMock(), paddingScale: spacingScale),
+              _SectionCard(
+                  title: '问题分析',
+                  child: const _AnalysisMock(),
+                  paddingScale: spacingScale),
               SizedBox(height: 16 * spacingScale),
             ]),
           ),
@@ -206,7 +222,7 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
               paddingScale: spacingScale,
               child: SizedBox(
                 // 提高容器高度以避免内部卡片内容溢出产生黑黄条纹
-                height: 280,
+                height: 300,
                 child: _SpreadGridFillMock(
                   gap: 8 * spacingScale,
                   selected: _selectedSpread,
@@ -242,10 +258,13 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                     // 牌阵卡槽区（参考设计图，固定高度）
                     SizedBox(
                       height: 220,
-                      child: _SpreadSlotsView(spread: _selectedSpread, slots: _pickedFaces),
+                      child: _SpreadSlotsView(
+                          spread: _selectedSpread, slots: _pickedFaces),
                     ),
                     SizedBox(height: 12 * spacingScale),
-                    Center(child: Text('Tap to pick your card', style: text.bodyMedium)),
+                    Center(
+                        child: Text('Tap to pick your card',
+                            style: text.bodyMedium)),
                     const SizedBox(height: 6),
                     const Icon(Icons.favorite_border, size: 18),
                     SizedBox(height: 12 * spacingScale),
@@ -280,7 +299,18 @@ class _Face {
 
 List<_Face> _buildMockDeckFaces() {
   const labels = [
-    '山景', '猫咪', '海岸', '森林', '星空', '湖泊', '城市', '花朵', '沙漠', '河流', '雪地', '田野'
+    '山景',
+    '猫咪',
+    '海岸',
+    '森林',
+    '星空',
+    '湖泊',
+    '城市',
+    '花朵',
+    '沙漠',
+    '河流',
+    '雪地',
+    '田野'
   ];
   const colors = [
     Colors.blueGrey,
@@ -299,7 +329,8 @@ List<_Face> _buildMockDeckFaces() {
   return List.generate(labels.length, (i) {
     // 使用 Picsum 提供的示例图片，若加载失败将回退到渐变背景
     final url = 'https://picsum.photos/seed/${i + 1}/400/640';
-    return _Face(color: colors[i % colors.length], label: labels[i], imageUrl: url);
+    return _Face(
+        color: colors[i % colors.length], label: labels[i], imageUrl: url);
   });
 }
 
@@ -343,8 +374,10 @@ class _SpreadSlotsView extends StatelessWidget {
             children: [
               for (int i = 0; i < len; i++)
                 Positioned(
-                  left: (positions[i].dx * constraints.maxWidth) - slotWidth / 2,
-                  top: (positions[i].dy * constraints.maxHeight) - slotHeight / 2,
+                  left:
+                      (positions[i].dx * constraints.maxWidth) - slotWidth / 2,
+                  top: (positions[i].dy * constraints.maxHeight) -
+                      slotHeight / 2,
                   width: slotWidth,
                   height: slotHeight,
                   child: slots[i] == null
@@ -354,8 +387,10 @@ class _SpreadSlotsView extends StatelessWidget {
               if (positions.length > len)
                 for (int i = len; i < positions.length; i++)
                   Positioned(
-                    left: (positions[i].dx * constraints.maxWidth) - slotWidth / 2,
-                    top: (positions[i].dy * constraints.maxHeight) - slotHeight / 2,
+                    left: (positions[i].dx * constraints.maxWidth) -
+                        slotWidth / 2,
+                    top: (positions[i].dy * constraints.maxHeight) -
+                        slotHeight / 2,
                     width: slotWidth,
                     height: slotHeight,
                     child: _EmptySlot(highlight: i == nextIndex),
@@ -375,19 +410,27 @@ class _EmptySlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // 主题色中的金色外发光（与主题主色混合偏金色）
-    final Color glowColor = Color.lerp(theme.colorScheme.primary, Colors.amber, 0.5)!
-        .withOpacity(0.7);
+    final Color glowColor =
+        Color.lerp(theme.colorScheme.primary, Colors.amber, 0.5)!
+            .withOpacity(0.7);
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.35), width: 1.2),
+        border: Border.all(
+            color: theme.colorScheme.outline.withOpacity(0.35), width: 1.2),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, spreadRadius: 1),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              spreadRadius: 1),
           if (highlight)
             BoxShadow(color: glowColor, blurRadius: 28, spreadRadius: 2.5),
           if (highlight)
-            BoxShadow(color: glowColor.withOpacity(0.45), blurRadius: 12, spreadRadius: 1.2),
+            BoxShadow(
+                color: glowColor.withOpacity(0.45),
+                blurRadius: 12,
+                spreadRadius: 1.2),
         ],
       ),
       alignment: Alignment.center,
@@ -404,60 +447,77 @@ class _FaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final border = Border.all(color: theme.colorScheme.outline.withOpacity(0.35));
+    final border =
+        Border.all(color: theme.colorScheme.outline.withOpacity(0.35));
     // 主题色中的金色外发光（与主题主色混合偏金色）
-    final Color glowColor = Color.lerp(theme.colorScheme.primary, Colors.amber, 0.5)!
-        .withOpacity(0.7);
+    final Color glowColor =
+        Color.lerp(theme.colorScheme.primary, Colors.amber, 0.5)!
+            .withOpacity(0.7);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         border: border,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, spreadRadius: 1),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              spreadRadius: 1),
           if (highlight)
             BoxShadow(color: glowColor, blurRadius: 30, spreadRadius: 2.5),
           if (highlight)
-            BoxShadow(color: glowColor.withOpacity(0.45), blurRadius: 14, spreadRadius: 1.2),
+            BoxShadow(
+                color: glowColor.withOpacity(0.45),
+                blurRadius: 14,
+                spreadRadius: 1.2),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         clipBehavior: Clip.antiAliasWithSaveLayer,
         child: face.imageUrl != null
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  face.imageUrl!,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stack) {
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [face.color.withOpacity(0.85), face.color.withOpacity(0.55)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    face.imageUrl!,
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stack) {
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              face.color.withOpacity(0.85),
+                              face.color.withOpacity(0.55)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                         ),
-                      ),
-                      child: Center(child: Text(face.label, style: Theme.of(context).textTheme.labelSmall)),
-                    );
-                  },
+                        child: Center(
+                            child: Text(face.label,
+                                style: Theme.of(context).textTheme.labelSmall)),
+                      );
+                    },
+                  ),
+                ],
+              )
+            : DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      face.color.withOpacity(0.85),
+                      face.color.withOpacity(0.55)
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
-              ],
-            )
-          : DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [face.color.withOpacity(0.85), face.color.withOpacity(0.55)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                child: Center(
+                  child: Text(face.label,
+                      style: Theme.of(context).textTheme.labelSmall),
                 ),
               ),
-              child: Center(
-                child: Text(face.label, style: Theme.of(context).textTheme.labelSmall),
-              ),
-            ),
       ),
     );
   }
@@ -476,10 +536,32 @@ class _PickDeckStrip extends StatefulWidget {
 class _PickDeckStripState extends State<_PickDeckStrip> {
   late final ScrollController _controller;
   bool _offsetInitialized = false;
+  _Face? _centerFace; // 记录当前最中心的牌
+  int? _centerFaceIndex; // 记录当前最中心牌的索引
+  final Set<int> _revealedFaceIndices = {}; // 记录已翻开的牌的索引
 
-  // 为实现“无限循环”，将卡组重复到一个很大的数量
+  // 为实现"无限循环"，将卡组重复到一个很大的数量
   static const int _repeatMultiplier = 5000; // 适度的大，避免过长构建
   int get _virtualCount => widget.faces.length * _repeatMultiplier;
+
+  // 更新当前最中心的牌
+  void _updateCenterFace(double itemExtent) {
+    if (!_controller.hasClients) return;
+
+    // 计算当前视口中心位置对应的卡片索引
+    final double viewportCenter =
+        _controller.offset + _controller.position.viewportDimension / 2;
+    final int centerCardIndex = (viewportCenter / itemExtent).round().toInt();
+
+    // 确保索引在有效范围内
+    final int effectiveIndex = centerCardIndex % widget.faces.length;
+
+    // 更新最中心的牌和索引
+    setState(() {
+      _centerFace = widget.faces[effectiveIndex];
+      _centerFaceIndex = effectiveIndex;
+    });
+  }
 
   @override
   void initState() {
@@ -497,100 +579,181 @@ class _PickDeckStripState extends State<_PickDeckStrip> {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final double deckHeight = constraints.maxHeight;
-      // 卡牌尺寸：遵循正常塔罗卡比例（w/h≈0.58），并预留顶部的弧形下沉空间
+      // 卡牌尺寸：遵循标准塔罗卡比例（宽高比约为0.62），并预留顶部的弧形下沉空间
       final double cardHeight = deckHeight * 0.82;
       final double cardWidth = cardHeight * 0.62;
 
       // 为了实现重叠与弧形效果，主轴宽度设置为小于卡牌宽度的 itemExtent
       // 这样相邻卡会互相覆盖（叠在一起），产生扇形效果
-      final double itemExtent = cardWidth * 0.84;
+      // 调整这个值可以控制卡牌的重叠程度，使视觉效果更佳
+      final double itemExtent = cardWidth * 0.7; // 增大重叠比例，使卡牌排列更紧密但不至于过于拥挤
       // 在轻微弧线基础上略微增大弧度
-      final double radius = math.max(deckHeight * 3.2, constraints.maxWidth * 1.8);
-      const double curvatureFactor = 0.40; // 小幅提升下沉幅度
+      final double radius =
+          math.max(deckHeight * 3.2, constraints.maxWidth * 1.8);
+      // 调整曲率因子，使弧形效果更自然
+      const double curvatureFactor = 0.25; // 适当减小曲率，使卡牌排列更平缓自然
 
       // 初次构建时，将滚动位置跳到“中点”，制造无限循环的体验
       if (!_offsetInitialized) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_controller.hasClients) return;
-          final double midOffset = (_virtualCount / 2) * itemExtent - constraints.maxWidth / 2;
-          final double clamped = midOffset.clamp(0.0, _controller.position.maxScrollExtent);
+          final double midOffset = (_virtualCount / 2) * itemExtent;
+          // 调整偏移量，使中心卡片位于屏幕中心
+          final double adjustedOffset =
+              midOffset - constraints.maxWidth / 2 + itemExtent / 2;
+          final double clamped =
+              adjustedOffset.clamp(0.0, _controller.position.maxScrollExtent);
           _controller.jumpTo(clamped);
           _offsetInitialized = true;
+
+          // 初始化中心牌
+          _updateCenterFace(itemExtent);
         });
       }
 
-      return ScrollConfiguration(
-        behavior: const _HScrollBehavior(),
-        child: NotificationListener<ScrollEndNotification>(
-          onNotification: (notif) {
-            if (!_controller.hasClients) return false;
-            // 计算最接近中心的卡索引，并在滚动结束时吸附到该位置
-            final double viewportCenter = _controller.offset + constraints.maxWidth / 2;
-            final double centerIndexExact = (viewportCenter - itemExtent / 2) / itemExtent;
-            final int snapIndex = centerIndexExact.round().clamp(0, _virtualCount - 1);
-            final double targetOffset = snapIndex * itemExtent + itemExtent / 2 - constraints.maxWidth / 2;
-            final double clamped = targetOffset.clamp(_controller.position.minScrollExtent, _controller.position.maxScrollExtent);
-            _controller.animateTo(
-              clamped,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-            );
-            return false;
-          },
-          child: ListView.builder(
+      return NotificationListener<ScrollNotification>(
+        onNotification: (notif) {
+          if (!_controller.hasClients) return false;
+
+          // 处理滚动结束事件，确保档位切换和居中显示
+          if (notif is ScrollEndNotification) {
+            // 更新最中心的牌
+            _updateCenterFace(itemExtent);
+            return true;
+          }
+
+          return false;
+        },
+        child: Scrollbar(
           controller: _controller,
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          // 裁剪到牌堆区域，避免内容溢出浮窗块边界
-          clipBehavior: Clip.hardEdge,
-          itemCount: _virtualCount,
-          itemExtent: itemExtent,
-          itemBuilder: (context, index) {
-            final _Face face = widget.faces[index % widget.faces.length];
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            physics: _SnapScrollPhysics(
+                itemExtent: itemExtent,
+                viewportWidth: constraints.maxWidth),
+            child: Row(
+              children: List.generate(_virtualCount, (index) {
+                final _Face face = widget.faces[index % widget.faces.length];
+                return SizedBox(
+                  width: itemExtent,
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) {
+                      // 缓存常用计算，减少重复计算
+                      final double viewportCenter =
+                          (_controller.hasClients ? _controller.offset : 0) +
+                              constraints.maxWidth / 2;
+                      final double itemCenter =
+                          index * itemExtent + itemExtent / 2;
+                      final double dx = itemCenter - viewportCenter;
 
-            // 根据滚动位置计算与视口中心的水平距离，再映射到弧形的垂直位移与旋转角度
-            return AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final double viewportCenter = (_controller.hasClients ? _controller.offset : 0) + constraints.maxWidth / 2;
-                final double itemCenter = index * itemExtent + itemExtent / 2;
-                final double dx = itemCenter - viewportCenter;
-                final double centerIndexExact = (viewportCenter - itemExtent / 2) / itemExtent;
-                final int centerIndex = centerIndexExact.round();
-                final bool isCenter = index == centerIndex;
-                final double r = radius;
-                final double clampedDx = dx.clamp(-r + 1, r - 1);
-                double dropY = (r - math.sqrt(math.max(0.0, r * r - clampedDx * clampedDx))) * curvatureFactor;
-                // 钳制垂直位移，确保不越出可视区域（牌堆高度内）
-                final double allowedDown = math.max(0.0, (deckHeight - cardHeight) / 2 - 2);
-                dropY = dropY.clamp(0.0, allowedDown);
-                final double angle = (clampedDx / r) * 0.14; // 略微增加倾斜，呼应弧度增强
-                // 中心卡往上抬升并轻微放大以凸显
-                final double lift = isCenter ? -cardHeight * 0.08 : 0.0;
-                final double scale = isCenter ? 1.06 : 1.0;
+                      // 简化计算，只在需要时计算复杂值
+                      final bool isCenter = (dx.abs() < itemExtent / 2);
+                      // 调整中心卡牌的放大和提升效果，使其更加突出
+                      final double scale = isCenter ? 1.1 : 1.0; // 增大放大比例
+                      final double lift =
+                          isCenter ? -cardHeight * 0.15 : 0.0; // 增大提升幅度
 
-                return Center(
-                  child: Transform.translate(
-                    offset: Offset(0, dropY + lift),
-                    child: Transform.rotate(
-                      angle: angle,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: _ArcDeckCard(
-                          face: face,
-                          width: cardWidth,
-                          height: cardHeight,
-                          onTap: () => widget.onPick(face),
-                          highlight: isCenter,
+                      // 只对可见区域附近的卡片进行复杂计算
+                      if (dx.abs() > constraints.maxWidth) {
+                        return Center(
+                          child: Transform.translate(
+                            offset: Offset(0, lift),
+                            child: Transform.scale(
+                              scale: scale,
+                              child: _ArcDeckCard(
+                                face: face,
+                                width: cardWidth,
+                                height: cardHeight,
+                                onTap: () {
+                                  // 使用记录的最中心的牌，而不是当前点击的牌
+                                  if (_centerFace != null &&
+                                      _centerFaceIndex != null) {
+                                    // 检查这张牌是否已经翻开
+                                    if (!_revealedFaceIndices
+                                        .contains(_centerFaceIndex!)) {
+                                      // 标记为已翻开
+                                      setState(() {
+                                        _revealedFaceIndices
+                                            .add(_centerFaceIndex!);
+                                      });
+                                      // 触发回调
+                                      widget.onPick(_centerFace!);
+                                    }
+                                  }
+                                },
+                                highlight: isCenter,
+                                isRevealed: _revealedFaceIndices
+                                    .contains(index % widget.faces.length),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      // 对可见区域的卡片进行完整计算
+                      final double centerIndexExact =
+                          (viewportCenter - itemExtent / 2) / itemExtent;
+                      final int centerIndex = centerIndexExact.round();
+                      final double r = radius;
+                      final double clampedDx = dx.clamp(-r + 1, r - 1);
+                      double dropY = (r -
+                              math.sqrt(math.max(
+                                  0.0, r * r - clampedDx * clampedDx))) *
+                          curvatureFactor;
+                      // 钳制垂直位移，确保不越出可视区域（牌堆高度内）
+                      final double allowedDown =
+                          math.max(0.0, (deckHeight - cardHeight) / 2 - 2);
+                      dropY = dropY.clamp(0.0, allowedDown);
+                      // 调整倾斜角度计算，使其更符合弧形排列的视觉效果
+                      final double angle =
+                          (clampedDx / r) * 0.18; // 增大倾斜角度，使卡牌更贴合弧形
+
+                      return Center(
+                        child: Transform.translate(
+                          offset: Offset(0, dropY + lift),
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Transform.rotate(
+                              angle: angle,
+                              alignment: Alignment.center, // 确保以卡牌自身为中心旋转
+                              child: _ArcDeckCard(
+                                face: face,
+                                width: cardWidth,
+                                height: cardHeight,
+                                onTap: () {
+                                  // 使用记录的最中心的牌，而不是当前点击的牌
+                                  if (_centerFace != null &&
+                                      _centerFaceIndex != null) {
+                                    // 检查这张牌是否已经翻开
+                                    if (!_revealedFaceIndices
+                                        .contains(_centerFaceIndex!)) {
+                                      // 标记为已翻开
+                                      setState(() {
+                                        _revealedFaceIndices
+                                            .add(_centerFaceIndex!);
+                                      });
+                                      // 触发回调
+                                      widget.onPick(_centerFace!);
+                                    }
+                                  }
+                                },
+                                highlight: isCenter,
+                                isRevealed: _revealedFaceIndices
+                                    .contains(index % widget.faces.length),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 );
-              },
-            );
-          },
-        ),
+              }),
+            ),
+          ),
         ),
       );
     });
@@ -603,47 +766,121 @@ class _ArcDeckCard extends StatelessWidget {
   final double height;
   final VoidCallback onTap;
   final bool highlight;
-  const _ArcDeckCard({required this.face, required this.width, required this.height, required this.onTap, this.highlight = false});
+  final bool isRevealed;
+  const _ArcDeckCard(
+      {required this.face,
+      required this.width,
+      required this.height,
+      required this.onTap,
+      this.highlight = false,
+      this.isRevealed = false});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return GestureDetector(
-      onTap: onTap,
+      onTap: isRevealed ? null : onTap, // 已翻开的牌不能再次点击
       child: SizedBox(
         width: width,
         height: height,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
+            border:
+                Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, spreadRadius: 1),
+              // 增强基础阴影效果，使其更具立体感
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 12,
+                spreadRadius: 2,
+                offset: const Offset(0, 2),
+              ),
               if (highlight)
-                BoxShadow(color: Color.lerp(Colors.amber, theme.colorScheme.primary, 0.3)!.withOpacity(0.25), blurRadius: 20, spreadRadius: 2),
+                // 添加多层发光效果，营造金色外发光
+                BoxShadow(
+                  color: Colors.amber.withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 0),
+                ),
+              if (highlight)
+                BoxShadow(
+                  color: Colors.amber.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 8,
+                  offset: const Offset(0, 0),
+                ),
+              if (highlight)
+                BoxShadow(
+                  color: Colors.amber.withOpacity(0.2),
+                  blurRadius: 40,
+                  spreadRadius: 12,
+                  offset: const Offset(0, 0),
+                ),
             ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAliasWithSaveLayer,
             child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const _TarotCardBack(),
-              if (highlight)
-                Align(
-                  alignment: Alignment.center,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(999),
+              fit: StackFit.expand,
+              children: [
+                // 根据是否已翻开显示不同的内容
+                isRevealed
+                    ? Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              face.color.withOpacity(0.85),
+                              face.color.withOpacity(0.55)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(face.label,
+                              style: Theme.of(context).textTheme.labelSmall),
+                        ),
+                      )
+                    : const _TarotCardBack(),
+                if (highlight && !isRevealed)
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text('选择',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: Colors.white)),
                     ),
-                    child: Text('选择', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white)),
                   ),
-                ),
-            ],
-          ),
+                if (isRevealed)
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text('已翻开',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: Colors.white)),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -658,7 +895,9 @@ class _TarotCardBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final Color gold = Color.lerp(Colors.amber, theme.colorScheme.primary, 0.15)!.withOpacity(0.95);
+    final Color gold =
+        Color.lerp(Colors.amber, theme.colorScheme.primary, 0.15)!
+            .withOpacity(0.95);
     final Color deep1 = const Color(0xFF160B2C); // 深紫
     final Color deep2 = const Color(0xFF0D071B); // 更深紫
     return DecoratedBox(
@@ -685,8 +924,10 @@ class _TarotBackPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     // 外层与内层金边
-    final outer = RRect.fromRectAndRadius(rect.deflate(1.2), const Radius.circular(12));
-    final inner = RRect.fromRectAndRadius(rect.deflate(8), const Radius.circular(10));
+    final outer =
+        RRect.fromRectAndRadius(rect.deflate(1.2), const Radius.circular(12));
+    final inner =
+        RRect.fromRectAndRadius(rect.deflate(8), const Radius.circular(10));
     final outerPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.2
@@ -718,14 +959,18 @@ class _TarotBackPainter extends CustomPainter {
     // 左下
     final p3 = Path()
       ..moveTo(10, size.height - 22)
-      ..quadraticBezierTo(size.width * 0.18, size.height - 8, size.width * 0.34, size.height - 24)
-      ..quadraticBezierTo(size.width * 0.22, size.height - 18, size.width * 0.18, size.height - 28);
+      ..quadraticBezierTo(size.width * 0.18, size.height - 8, size.width * 0.34,
+          size.height - 24)
+      ..quadraticBezierTo(size.width * 0.22, size.height - 18,
+          size.width * 0.18, size.height - 28);
     canvas.drawPath(p3, deco);
     // 右下
     final p4 = Path()
       ..moveTo(size.width - 10, size.height - 22)
-      ..quadraticBezierTo(size.width * 0.82, size.height - 8, size.width * 0.66, size.height - 24)
-      ..quadraticBezierTo(size.width * 0.78, size.height - 18, size.width * 0.82, size.height - 28);
+      ..quadraticBezierTo(size.width * 0.82, size.height - 8, size.width * 0.66,
+          size.height - 24)
+      ..quadraticBezierTo(size.width * 0.78, size.height - 18,
+          size.width * 0.82, size.height - 28);
     canvas.drawPath(p4, deco);
 
     // 中心星徽与环圈
@@ -781,7 +1026,11 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
   final bool expandChild;
   final double? paddingScale;
-  const _SectionCard({required this.title, required this.child, this.expandChild = false, this.paddingScale});
+  const _SectionCard(
+      {required this.title,
+      required this.child,
+      this.expandChild = false,
+      this.paddingScale});
 
   @override
   Widget build(BuildContext context) {
@@ -901,7 +1150,8 @@ class _SpreadGridFillMock extends StatelessWidget {
   final double cardWidth;
   final _SpreadMock? selected;
   final ValueChanged<_SpreadMock>? onSelect;
-  const _SpreadGridFillMock({this.gap = 8, this.cardWidth = 260, this.selected, this.onSelect});
+  const _SpreadGridFillMock(
+      {this.gap = 8, this.cardWidth = 260, this.selected, this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -917,7 +1167,9 @@ class _SpreadGridFillMock extends StatelessWidget {
         itemCount: _mockSpreads.length,
         itemBuilder: (context, index) {
           final _SpreadMock item = _mockSpreads[index];
-          final bool isSelected = (selected != null && selected!.title == item.title && selected!.cards == item.cards);
+          final bool isSelected = (selected != null &&
+              selected!.title == item.title &&
+              selected!.cards == item.cards);
           return Padding(
             padding: EdgeInsets.only(right: gap),
             child: SizedBox(
@@ -933,6 +1185,135 @@ class _SpreadGridFillMock extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+// 自定义吸附模拟，确保每次滚动都停在一张牌的中心位置
+class _SnapScrollPhysics extends ScrollPhysics {
+  final double itemExtent;
+  final double viewportWidth;
+
+  const _SnapScrollPhysics(
+      {required this.itemExtent,
+      required this.viewportWidth,
+      ScrollPhysics? parent})
+      : super(parent: parent);
+
+  @override
+  _SnapScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _SnapScrollPhysics(
+      itemExtent: itemExtent,
+      viewportWidth: viewportWidth,
+      parent: buildParent(ancestor),
+    );
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    // 调整速度阈值，使滚动吸附更灵敏
+    // 当速度较小时，仍然可能需要创建吸附模拟以确保准确居中
+    if (velocity.abs() < 50) {
+      // 即使速度很小，也创建吸附模拟以确保精确居中
+      return _SnapSimulation(
+        position: position.pixels,
+        velocity: velocity,
+        extent: position.maxScrollExtent,
+        itemExtent: itemExtent,
+        viewportWidth: viewportWidth,
+      );
+    }
+
+    return _SnapSimulation(
+      position: position.pixels,
+      velocity: velocity,
+      extent: position.maxScrollExtent,
+      itemExtent: itemExtent,
+      viewportWidth: viewportWidth,
+    );
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    // 确保不会越过边界
+    if (value < position.minScrollExtent)
+      return position.minScrollExtent - value;
+    if (value > position.maxScrollExtent)
+      return value - position.maxScrollExtent;
+    return 0.0;
+  }
+}
+
+// 自定义吸附模拟，确保滚动停在最近的卡片中心
+class _SnapSimulation extends Simulation {
+  final double position;
+  final double velocity;
+  final double extent;
+  final double itemExtent;
+  final double viewportWidth;
+  final double targetPosition;
+  final double _duration;
+
+  _SnapSimulation({
+    required this.position,
+    required this.velocity,
+    required this.extent,
+    required this.itemExtent,
+    required this.viewportWidth,
+  })  : _duration = 0.25, // 调整动画时间到250ms，使滚动更加流畅
+        // 计算目标位置，确保选中的卡片居中显示
+        targetPosition = _calculateTargetPosition(
+            position, itemExtent, viewportWidth, extent);
+
+  // 计算目标位置的静态方法
+  static double _calculateTargetPosition(
+      double position, double itemExtent, double viewportWidth, double extent) {
+    // 计算当前视口中心位置对应的卡片索引
+    final double viewportCenter = position + viewportWidth / 2;
+    final int centerCardIndex = (viewportCenter / itemExtent).round();
+
+    // 计算中心卡片应该居中的位置
+    final double targetOffset =
+        centerCardIndex * itemExtent - viewportWidth / 2 + itemExtent / 2;
+
+    // 确保在边界范围内
+    return targetOffset.clamp(0.0, extent);
+  }
+
+  @override
+  double x(double time) {
+    // 使用与ScrollEndNotification一致的动画时间，确保动画效果平滑
+    final double t = (time / _duration).clamp(0.0, 1.0);
+    final double easedT = _easeOutCubic(t);
+
+    // 计算当前位置到目标位置的插值
+    // 确保动画开始和结束位置准确无误
+    final double result = lerpDouble(position, targetPosition, easedT)!;
+
+    // 确保结果在有效范围内
+    return result.clamp(0.0, extent);
+  }
+
+  @override
+  double dx(double time) {
+    // 计算速度
+    final double dt = 0.016; // 约60fps
+    if (time + dt > duration) return 0.0;
+    return (x(time + dt) - x(time)) / dt;
+  }
+
+  @override
+  bool isDone(double time) => time >= _duration;
+
+  @override
+  double get duration => _duration;
+
+  // 缓动函数
+  double _easeOutCubic(double t) {
+    return 1.0 - math.pow(1.0 - t, 3.0);
   }
 }
 
@@ -952,7 +1333,11 @@ class _SpreadCardMock extends StatelessWidget {
   final bool fill;
   final bool selected;
   final VoidCallback? onTap;
-  const _SpreadCardMock({required this.spread, this.fill = false, this.selected = false, this.onTap});
+  const _SpreadCardMock(
+      {required this.spread,
+      this.fill = false,
+      this.selected = false,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -962,8 +1347,18 @@ class _SpreadCardMock extends StatelessWidget {
         ? theme.colorScheme.primary
         : theme.colorScheme.outline.withOpacity(0.3);
     final List<BoxShadow> glow = selected
-        ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.25), blurRadius: 14, spreadRadius: 1.2)]
-        : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, spreadRadius: 1)];
+        ? [
+            BoxShadow(
+                color: theme.colorScheme.primary.withOpacity(0.25),
+                blurRadius: 14,
+                spreadRadius: 1.2)
+          ]
+        : [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 8,
+                spreadRadius: 1)
+          ];
 
     final card = Container(
       // 当 fill=true 时由父布局控制高度，这里不设置固定高度
@@ -980,7 +1375,10 @@ class _SpreadCardMock extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(spread.title, style: text.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(spread.title,
+                  style: text.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
               const Spacer(),
               _CountBadge(count: spread.cards),
             ],
@@ -992,7 +1390,8 @@ class _SpreadCardMock extends StatelessWidget {
               spread.desc,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: text.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.75)),
+              style: text.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.75)),
             ),
           ),
           if (fill) const SizedBox(height: 8),
@@ -1005,12 +1404,14 @@ class _SpreadCardMock extends StatelessWidget {
           if (selected)
             Align(
               alignment: Alignment.bottomRight,
-              child: Icon(Icons.check_circle, color: theme.colorScheme.primary.withOpacity(0.9), size: 18),
+              child: Icon(Icons.check_circle,
+                  color: theme.colorScheme.primary.withOpacity(0.9), size: 18),
             ),
         ],
       ),
     );
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: card);
+    return InkWell(
+        onTap: onTap, borderRadius: BorderRadius.circular(12), child: card);
   }
 }
 
@@ -1039,8 +1440,10 @@ class _SpreadPreview extends StatelessWidget {
             children: [
               for (int i = 0; i < positions.length; i++)
                 Positioned(
-                  left: (positions[i].dx * constraints.maxWidth) - slotWidth / 2,
-                  top: (positions[i].dy * constraints.maxHeight) - slotHeight / 2,
+                  left:
+                      (positions[i].dx * constraints.maxWidth) - slotWidth / 2,
+                  top: (positions[i].dy * constraints.maxHeight) -
+                      slotHeight / 2,
                   width: slotWidth,
                   height: slotHeight,
                   child: _CardSlotPreview(label: '${i + 1}'),
@@ -1066,7 +1469,10 @@ class _CardSlotPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, spreadRadius: 1),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              spreadRadius: 1),
         ],
       ),
       alignment: Alignment.center,
@@ -1117,47 +1523,63 @@ List<_Pos> _positionsForSpread(_SpreadMock spread) {
       _Pos(0.80, 0.30), // 10 权杖上
     ];
   }
-  // 七点马蹄：马蹄形弧线
+  // 七点马蹄：对称马蹄形
   if (t.contains('马蹄') && n == 7) {
     return const [
-      _Pos(0.10, 0.70),
-      _Pos(0.25, 0.60),
-      _Pos(0.40, 0.50),
-      _Pos(0.55, 0.40),
-      _Pos(0.70, 0.50),
-      _Pos(0.85, 0.60),
-      _Pos(0.90, 0.70),
+      _Pos(0.15, 0.65), // 左下
+      _Pos(0.25, 0.55), // 左中
+      _Pos(0.35, 0.45), // 左上
+      _Pos(0.50, 0.40), // 顶部中心
+      _Pos(0.65, 0.45), // 右上
+      _Pos(0.75, 0.55), // 右中
+      _Pos(0.85, 0.65), // 右下
     ];
   }
   // 关系六点：两行各三张
   if ((t.contains('关系') || n == 6) && n == 6) {
     return const [
-      _Pos(0.20, 0.35), _Pos(0.50, 0.35), _Pos(0.80, 0.35),
-      _Pos(0.20, 0.65), _Pos(0.50, 0.65), _Pos(0.80, 0.65),
+      _Pos(0.20, 0.35),
+      _Pos(0.50, 0.35),
+      _Pos(0.80, 0.35),
+      _Pos(0.20, 0.65),
+      _Pos(0.50, 0.65),
+      _Pos(0.80, 0.65),
     ];
   }
   // 四象限 / 两选一 / 月度洞察：2x2
   if ((t.contains('四象限') || t.contains('两选一') || t.contains('月度')) && n == 4) {
     return const [
-      _Pos(0.35, 0.35), _Pos(0.65, 0.35),
-      _Pos(0.35, 0.65), _Pos(0.65, 0.65),
+      _Pos(0.35, 0.35),
+      _Pos(0.65, 0.35),
+      _Pos(0.35, 0.65),
+      _Pos(0.65, 0.65),
     ];
   }
   // 九宫格：3x3
   if (t.contains('九宫') && n == 9) {
     return const [
-      _Pos(0.20, 0.25), _Pos(0.50, 0.25), _Pos(0.80, 0.25),
-      _Pos(0.20, 0.50), _Pos(0.50, 0.50), _Pos(0.80, 0.50),
-      _Pos(0.20, 0.75), _Pos(0.50, 0.75), _Pos(0.80, 0.75),
+      _Pos(0.20, 0.25),
+      _Pos(0.50, 0.25),
+      _Pos(0.80, 0.25),
+      _Pos(0.20, 0.50),
+      _Pos(0.50, 0.50),
+      _Pos(0.80, 0.50),
+      _Pos(0.20, 0.75),
+      _Pos(0.50, 0.75),
+      _Pos(0.80, 0.75),
     ];
   }
   // 金字塔八点：1+2+3+2
   if (t.contains('金字塔') && n == 8) {
     return const [
       _Pos(0.50, 0.20),
-      _Pos(0.35, 0.40), _Pos(0.65, 0.40),
-      _Pos(0.25, 0.60), _Pos(0.50, 0.60), _Pos(0.75, 0.60),
-      _Pos(0.35, 0.80), _Pos(0.65, 0.80),
+      _Pos(0.35, 0.40),
+      _Pos(0.65, 0.40),
+      _Pos(0.25, 0.60),
+      _Pos(0.50, 0.60),
+      _Pos(0.75, 0.60),
+      _Pos(0.35, 0.80),
+      _Pos(0.65, 0.80),
     ];
   }
   // 默认：水平排列 n 张，超出则自动压缩为换行
@@ -1191,7 +1613,11 @@ class _CountBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
       ),
-      child: Text('$count 张', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+      child: Text('$count 张',
+          style: Theme.of(context)
+              .textTheme
+              .labelSmall
+              ?.copyWith(color: theme.colorScheme.primary)),
     );
   }
 }
@@ -1224,13 +1650,43 @@ class _DotsPlaceholder extends StatelessWidget {
   }
 }
 
+class _BoxPlaceholder extends StatelessWidget {
+  final double height;
+  final String label;
+  const _BoxPlaceholder({required this.height, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.3)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurface.withOpacity(0.7),
+        ),
+      ),
+    );
+  }
+}
+
 // 第二页：抽牌卡格
 class _DrawCardsGrid extends StatelessWidget {
   final int count;
   final List<bool> revealed;
   final void Function(int index) onFlip;
   final double spacingScale;
-  const _DrawCardsGrid({required this.count, required this.revealed, required this.onFlip, required this.spacingScale});
+  const _DrawCardsGrid(
+      {required this.count,
+      required this.revealed,
+      required this.onFlip,
+      required this.spacingScale});
 
   @override
   Widget build(BuildContext context) {
@@ -1263,9 +1719,13 @@ class _DrawCardsGrid extends StatelessWidget {
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
+                border: Border.all(
+                    color: theme.colorScheme.outline.withOpacity(0.35)),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, spreadRadius: 1),
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      spreadRadius: 1),
                 ],
               ),
               alignment: Alignment.center,
@@ -1273,16 +1733,22 @@ class _DrawCardsGrid extends StatelessWidget {
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
+                        Icon(Icons.auto_awesome,
+                            color: theme.colorScheme.primary),
                         const SizedBox(height: 8),
                         Text('卡面 ${index + 1}', style: text.titleSmall),
-                        Text('Mock 含义与关键词', style: text.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7))),
+                        Text('Mock 含义与关键词',
+                            style: text.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.7))),
                       ],
                     )
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.style, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                        Icon(Icons.style,
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.6)),
                         const SizedBox(height: 8),
                         Text('点击翻开', style: text.bodySmall),
                       ],

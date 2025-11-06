@@ -156,7 +156,7 @@ class _NavItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 62, // 统一高度，保证文字基线对齐
+            height: 58, // 减少高度以避免溢出
             width: isCenter ? 62 : 44,
             child: Center(
               child: AnimatedContainer(
@@ -169,7 +169,7 @@ class _NavItem extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4), // 减少间距
           Text(label, style: TextStyle(color: fg, fontSize: 12)),
         ],
       ),

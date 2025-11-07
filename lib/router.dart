@@ -14,22 +14,30 @@ GoRouter createRouter() {
     initialLocation: '/home',
     routes: [
       ShellRoute(
-        builder: (context, state, child) => NavShell(child: child),
+        pageBuilder: (context, state, child) => NoTransitionPage<void>(
+          child: NavShell(child: child),
+        ),
         routes: [
           GoRoute(
             path: '/home',
             name: 'home',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: HomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/chat',
             name: 'chat',
-            builder: (context, state) => const ChatScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: ChatScreen(),
+            ),
           ),
           GoRoute(
             path: '/profile',
             name: 'profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: ProfileScreen(),
+            ),
           ),
         ],
       ),

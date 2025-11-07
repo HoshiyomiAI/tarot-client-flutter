@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
-import 'package:flutter/physics.dart';
+import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// 抽卡弹窗（占位版）：用于确定布局与大致位置，无实际功能
+/// 抽卡结果（公开给外部消费）
+class DrawCardResult {
+  final String name;
+  final bool reversed;
+  const DrawCardResult(this.name, this.reversed);
+}
+
+/// 牌阵结果（含牌阵信息与按槽位顺序排列的卡片）
+class DrawSpreadResult {
+  final String spreadTitle;
+  final int count;
+  final List<DrawCardResult> cards;
+  const DrawSpreadResult({required this.spreadTitle, required this.count, required this.cards});
+}
+
+/// 抽卡弹窗：返回抽取到的结果列表（取消返回 null）
 class DrawModal {
-  static Future<void> show(BuildContext context) async {
-    await showModalBottomSheet<void>(
+  static Future<DrawSpreadResult?> show(BuildContext context) async {
+    return await showModalBottomSheet<DrawSpreadResult?>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
@@ -61,12 +75,26 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
   int _step = 0; // 0: Step1, 1: Step2
   _SpreadMock _selectedSpread = _mockSpreads.first; // 可变：支持在第一页选择牌阵
   List<bool> _revealed = List<bool>.filled(_mockSpreads.first.cards, false);
-  // Step2：按所选牌阵的卡位进行抽取，记录已选卡面
-  late List<_Face?> _pickedFaces =
-      List<_Face?>.filled(_selectedSpread.cards, null);
+  // Step2：按所选牌阵的卡位进行抽取，记录已选卡（含正/逆位与顺序）
+  late List<_PickedCard?> _pickedCards =
+      List<_PickedCard?>.filled(_selectedSpread.cards, null);
   final List<_Face> _deckFaces = _buildMockDeckFaces();
 
   bool get _allRevealed => _revealed.every((v) => v);
+
+  DrawSpreadResult _buildResults() {
+    final List<DrawCardResult> res = [];
+    for (final pc in _pickedCards) {
+      if (pc != null) {
+        res.add(DrawCardResult(pc.face.label, pc.reversed));
+      }
+    }
+    return DrawSpreadResult(
+      spreadTitle: _selectedSpread.title,
+      count: _selectedSpread.cards,
+      cards: res,
+    );
+  }
 
   @override
   void initState() {
@@ -75,12 +103,16 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
     _deckFaces.shuffle(math.Random());
   }
 
-  // 从牌堆中选择一张牌，按顺序填充到上半部分的下一个空卡位
-  bool _pickFromDeck(_Face face) {
-    final int nextIndex = _pickedFaces.indexWhere((f) => f == null);
+  // 从牌堆中选择一张牌，按顺序填充到上半部分的下一个空卡位（保留正/逆位与顺序）
+  bool _pickFromDeck(_PickEvent event) {
+    final int nextIndex = _pickedCards.indexWhere((f) => f == null);
     if (nextIndex == -1) return false; // 已填满，拒绝继续抽
     setState(() {
-      _pickedFaces[nextIndex] = face;
+      _pickedCards[nextIndex] = _PickedCard(
+        face: event.face,
+        reversed: event.reversed,
+        order: event.order,
+      );
       _revealed[nextIndex] = true;
     });
     return true; // 接受本次抽牌
@@ -92,7 +124,7 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
     setState(() {
       _selectedSpread = s;
       _revealed = List<bool>.filled(s.cards, false);
-      _pickedFaces = List<_Face?>.filled(s.cards, null);
+      _pickedCards = List<_PickedCard?>.filled(s.cards, null);
     });
   }
 
@@ -181,15 +213,56 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                     child: SizedBox(
                       height: 48,
                       width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _step == 0
-                            ? () => setState(() => _step = 1)
-                            : () => Navigator.of(context).pop(),
-                        child: Text(
-                          _step == 0 ? '继续' : '完成',
-                          style: textTheme.titleMedium,
-                        ),
-                      ),
+                      child: Builder(builder: (context) {
+                        final bool canFinish = _step == 1 && _allRevealed;
+                        return ElevatedButton(
+                          style: ButtonStyle(
+                            backgroundColor: MaterialStateProperty.resolveWith(
+                              (states) {
+                                const deep = Color(0xFF1A1724); // 非常深的深紫色
+                                if (states.contains(MaterialState.disabled)) {
+                                  return deep.withOpacity(0.85);
+                                }
+                                if (states.contains(MaterialState.pressed)) {
+                                  return deep.withOpacity(0.92);
+                                }
+                                return deep;
+                              },
+                            ),
+                            foregroundColor: MaterialStateProperty.resolveWith(
+                              (states) => states.contains(MaterialState.disabled)
+                                  ? Colors.white70
+                                  : Colors.white,
+                            ),
+                            shadowColor: MaterialStateProperty.resolveWith(
+                              (states) => states.contains(MaterialState.disabled)
+                                  ? Colors.transparent
+                                  : Colors.black.withOpacity(0.2),
+                            ),
+                            elevation: MaterialStateProperty.resolveWith(
+                              (states) => states.contains(MaterialState.disabled) ? 0 : 1,
+                            ),
+                            shape: MaterialStateProperty.all(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Colors.white.withOpacity(0.10),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          onPressed: _step == 0
+                              ? () => setState(() => _step = 1)
+                              : (canFinish
+                                  ? () => Navigator.of(context).pop(_buildResults())
+                                  : null),
+                          child: Text(
+                            _step == 0 ? '继续' : '完成',
+                            style: textTheme.titleMedium,
+                          ),
+                        );
+                      }),
                     ),
                   ),
                 ],
@@ -275,29 +348,110 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                 SizedBox(height: 20 * spacingScale),
                 Expanded(
                   child: _SpreadSlotsView(
-                      spread: _selectedSpread, slots: _pickedFaces),
+                      spread: _selectedSpread, slots: _pickedCards),
                 ),
               ],
             ),
           ),
           Expanded(
             flex: 3,
-            child: Column(
-              children: [
-                SizedBox(height: 10 * spacingScale),
-                Text(
-                  'Drag to move',
-                  style: text.bodyMedium
-                      ?.copyWith(color: Colors.white.withOpacity(0.8)),
-                ),
-                SizedBox(height: 20 * spacingScale),
-                Expanded(
-                  child: _PickDeckStrip(
-                    faces: _deckFaces,
-                    onPick: _pickFromDeck,
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double deadZone = 28 * spacingScale; // 底部保留不可触发区域
+                return Stack(
+                  children: [
+                    // 扩大手势触发范围：让牌堆手势覆盖下半部分大区域，排除底部deadZone
+                    Positioned.fill(
+                      bottom: deadZone,
+                      child: _PickDeckStrip(
+                        faces: _deckFaces,
+                        onPick: _pickFromDeck,
+                      ),
+                    ),
+                    // 引导箭头与艺术字覆盖在底部，且不拦截手势
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: IgnorePointer(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 8 * spacingScale),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/images/arc_double_arrow.svg',
+                                width: 160,
+                                height: 36,
+                              ),
+                              SizedBox(height: 6 * spacingScale),
+                              SizedBox(
+                                width: 200,
+                                height: 28,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Text(
+                                      'Swipe to move',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        letterSpacing: 1,
+                                        foreground: Paint()
+                                          ..style = PaintingStyle.stroke
+                                          ..strokeWidth = 1.2
+                                          ..color = const Color(0xFF6A4B0A),
+                                        fontFamilyFallback: const [
+                                          'Brush Script MT',
+                                          'Snell Roundhand',
+                                          'Apple Chancery',
+                                          'Segoe Script',
+                                          'Lucida Handwriting',
+                                          'Pacifico',
+                                          'cursive',
+                                        ],
+                                      ),
+                                    ),
+                                    ShaderMask(
+                                      shaderCallback: (Rect bounds) => const LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0xFFF7D87A),
+                                          Color(0xFFE9C75C),
+                                          Color(0xFFD4AF37),
+                                        ],
+                                        stops: [0.0, 0.5, 1.0],
+                                      ).createShader(bounds),
+                                      blendMode: BlendMode.srcIn,
+                                      child: const Text(
+                                        'Swipe to move',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          letterSpacing: 1,
+                                          color: Colors.white,
+                                          fontFamilyFallback: [
+                                            'Brush Script MT',
+                                            'Snell Roundhand',
+                                            'Apple Chancery',
+                                            'Segoe Script',
+                                            'Lucida Handwriting',
+                                            'Pacifico',
+                                            'cursive',
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -312,6 +466,23 @@ class _Face {
   final String label;
   final String? imageUrl; // 支持图片卡面
   const _Face({required this.color, required this.label, this.imageUrl});
+}
+
+// 选中事件：自下方牌堆点击时传递的信息
+class _PickEvent {
+  final _Face face;
+  final bool reversed; // true 表示逆位
+  final int? order; // 第几张抽到
+  final int index; // 牌堆中的索引
+  const _PickEvent({required this.face, required this.reversed, this.order, required this.index});
+}
+
+// 已选中的卡：包含卡面与正/逆位以及抽取顺序
+class _PickedCard {
+  final _Face face;
+  final bool reversed; // true 表示逆位
+  final int? order; // 第几张抽到，可选
+  const _PickedCard({required this.face, required this.reversed, this.order});
 }
 
 List<_Face> _buildMockDeckFaces() {
@@ -347,7 +518,7 @@ List<_Face> _buildMockDeckFaces() {
 // 上半部分：按选定牌阵的 positions 展示可填充卡位
 class _SpreadSlotsView extends StatelessWidget {
   final _SpreadMock spread;
-  final List<_Face?> slots;
+  final List<_PickedCard?> slots;
   const _SpreadSlotsView({required this.spread, required this.slots});
 
   @override
@@ -391,7 +562,12 @@ class _SpreadSlotsView extends StatelessWidget {
                   height: slotHeight,
                   child: slots[i] == null
                       ? _EmptySlot(highlight: i == nextIndex)
-                      : _FaceCard(face: slots[i]!, highlight: i == nextIndex),
+                      : _FaceCard(
+                          face: slots[i]!.face,
+                          reversed: slots[i]!.reversed,
+                          order: slots[i]!.order,
+                          highlight: i == nextIndex,
+                        ),
                 ),
               if (positions.length > len)
                 for (int i = len; i < positions.length; i++)
@@ -452,8 +628,10 @@ class _EmptySlot extends StatelessWidget {
 
 class _FaceCard extends StatelessWidget {
   final _Face face;
+  final bool reversed;
+  final int? order;
   final bool highlight;
-  const _FaceCard({required this.face, this.highlight = false});
+  const _FaceCard({required this.face, required this.reversed, this.order, this.highlight = false});
 
   @override
   Widget build(BuildContext context) {
@@ -464,72 +642,77 @@ class _FaceCard extends StatelessWidget {
     final Color glowColor =
         Color.lerp(theme.colorScheme.primary, Colors.amber, 0.5)!
             .withOpacity(0.7);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: border,
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              spreadRadius: 1),
-          if (highlight)
-            BoxShadow(color: glowColor, blurRadius: 30, spreadRadius: 2.5),
-          if (highlight)
-            BoxShadow(
-                color: glowColor.withOpacity(0.45),
-                blurRadius: 14,
-                spreadRadius: 1.2),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        clipBehavior: Clip.antiAliasWithSaveLayer,
-        child: face.imageUrl != null
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    face.imageUrl!,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stack) {
-                      return DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              face.color.withOpacity(0.85),
-                              face.color.withOpacity(0.55)
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: Center(
-                            child: Text(face.label,
-                                style: Theme.of(context).textTheme.labelSmall)),
-                      );
-                    },
-                  ),
-                ],
-              )
-            : DecoratedBox(
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: border,
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  spreadRadius: 1),
+              if (highlight)
+                BoxShadow(color: glowColor, blurRadius: 30, spreadRadius: 2.5),
+              if (highlight)
+                BoxShadow(
+                    color: glowColor.withOpacity(0.45),
+                    blurRadius: 14,
+                    spreadRadius: 1.2),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAliasWithSaveLayer,
+            child: Transform.rotate(
+              angle: reversed ? math.pi : 0,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      face.color.withOpacity(0.85),
-                      face.color.withOpacity(0.55)
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: face.color, // 纯色背景替代图片
                 ),
                 child: Center(
-                  child: Text(face.label,
-                      style: Theme.of(context).textTheme.labelSmall),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        for (final ch in face.label.split(''))
+                          Text(
+                            ch,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.05,
+                                ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-      ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
+            ),
+            child: Text(
+              '${order != null ? '第$order张 · ' : ''}${reversed ? '逆位' : '正位'}',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -537,7 +720,7 @@ class _FaceCard extends StatelessWidget {
 // 下半部分：横向牌堆，点击将卡面填充到上方卡位
 class _PickDeckStrip extends StatefulWidget {
   final List<_Face> faces;
-  final bool Function(_Face face) onPick; // 返回是否接受本次抽牌
+  final bool Function(_PickEvent event) onPick; // 返回是否接受本次抽牌
   const _PickDeckStrip({required this.faces, required this.onPick});
 
   @override
@@ -545,29 +728,40 @@ class _PickDeckStrip extends StatefulWidget {
 }
 
 class _PickDeckStripState extends State<_PickDeckStrip>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
-  double _rotationAngle = 0.0;
   late List<bool> _revealed;
   late List<bool> _reversed; // 每张牌的正位/逆位状态（true=逆位）
   late List<int?> _drawOrder; // 每张牌的抽取顺序（第几张），未抽为 null
   int _acceptedCount = 0; // 已接受的抽牌数量
   // Removed dedicated picked index; use revealed state to persist highlight/offset.
+  static const double _alpha = 0.22; // 指针平滑系数（指数平滑）
+  static const double _pixelThreshold = 0.6; // 小于该像素位移忽略，降低抖动
+  double _lastDelta = 0.0; // 上一次平滑后的增量，用于EMA
+  // 预计算：每张卡的基础角度与三角函数，减少每帧计算成本
+  late List<double> _baseTheta;
+  late List<double> _baseCos;
+  late List<double> _baseSin;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController.unbounded(vsync: this)
-      ..addListener(() {
-        setState(() {
-          _rotationAngle = _controller.value;
-        });
-      });
+    _controller = AnimationController.unbounded(vsync: this);
     _revealed = List<bool>.filled(widget.faces.length, false, growable: false);
     // 每次进入页面随机正逆位（预先确定，点击后不再改变）
     final rand = math.Random();
     _reversed = List<bool>.generate(widget.faces.length, (_) => rand.nextBool(), growable: false);
     _drawOrder = List<int?>.filled(widget.faces.length, null, growable: false);
+    // 基础角度与三角函数：仅与索引相关，与实时旋转无关
+    const double sweepAngle = math.pi * 1.5;
+    const double theta0 = -math.pi / 2;
+    final int numCards = widget.faces.length;
+    _baseTheta = List<double>.generate(numCards, (index) {
+      final double progress = index / (numCards - 1);
+      return theta0 + (progress - 0.5) * sweepAngle;
+    }, growable: false);
+    _baseCos = List<double>.generate(numCards, (i) => math.cos(_baseTheta[i]), growable: false);
+    _baseSin = List<double>.generate(numCards, (i) => math.sin(_baseTheta[i]), growable: false);
   }
 
   @override
@@ -599,65 +793,115 @@ class _PickDeckStripState extends State<_PickDeckStrip>
         final double phiLimit = ((1.0 - minCoverageRatio) * beta).clamp(0.0, math.pi * 2);
 
         return GestureDetector(
-          onPanStart: (details) {
+          behavior: HitTestBehavior.opaque, // 让整个区域都可命中手势，而不只卡片区域
+          onHorizontalDragStart: (details) {
             _controller.stop();
+            _lastDelta = 0.0;
           },
-          onPanUpdate: (details) {
-            setState(() {
-              // Increase sensitivity to expand the effective drag range
-              final double delta = details.delta.dx / (radius * 0.6);
-              final double next = _rotationAngle + delta;
-              // Clamp to keep at least half the horizontal width covered by cards
-              _rotationAngle = next.clamp(-phiLimit, phiLimit);
-              _controller.value = _rotationAngle; // keep controller in sync
-            });
+          onHorizontalDragUpdate: (details) {
+            final double? primary = details.primaryDelta; // 沿水平轴的增量，去除垂直噪声
+            if (primary == null) return;
+            // 忽略极小位移，降低像素级抖动
+            if (primary.abs() < _pixelThreshold) return;
+            // 原始增量映射到角度
+            final double raw = primary / (radius * 0.6);
+            // 指数平滑，降低抖动
+            final double smoothed = _alpha * raw + (1 - _alpha) * _lastDelta;
+            _lastDelta = smoothed;
+            final double next = _controller.value + smoothed;
+            // 限幅，保持至少一定水平覆盖
+            final double clamped = next.clamp(-phiLimit, phiLimit);
+            _controller.value = clamped; // 直接驱动 AnimatedBuilder
           },
-          onPanEnd: (details) {
-            // Remove rebound/snap: keep the angle at release without animation.
+          onHorizontalDragEnd: (details) {
+            // 保持当前角度，不做回弹
             _controller.stop();
+            _lastDelta = 0.0;
           },
-          child: Stack(
-            alignment: Alignment.center,
-            children: () {
-              final List<Widget> cardChildren = [];
-              final List<Widget> labelChildren = []; // 确保标签在所有卡片之上渲染
-              for (int index = 0; index < numCards; index++) {
-                const double pickOffset = 18.0; // outward movement for revealed (selected) cards
-                final double progress = index / (numCards - 1);
-                final double theta = theta0 + (progress - 0.5) * sweepAngle + _rotationAngle;
-                final bool isRevealed = _revealed[index];
-                final double localRadius = radius + (isRevealed ? pickOffset : 0.0);
-                final double x = centerX + localRadius * math.cos(theta);
-                final double y = centerY + localRadius * math.sin(theta);
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final double rotation = _controller.value;
+              // 旋转的三角函数（统一使用），与索引无关
+              final double cosR = math.cos(rotation);
+              final double sinR = math.sin(rotation);
+              // 视窗矩形，用于剔除不可见元素（包含边缘留白）
+              const double margin = 40.0;
+              final Rect viewport = Rect.fromLTWH(
+                -margin,
+                -margin,
+                constraints.maxWidth + margin * 2,
+                constraints.maxHeight + margin * 2,
+              );
+              return Stack(
+                fit: StackFit.expand, // 扩展至父布局的整个区域
+                alignment: Alignment.center,
+                children: () {
+                  final List<Widget> cardChildren = [];
+                  final List<Widget> labelChildren = []; // 确保标签在所有卡片之上渲染
+                  for (int index = 0; index < numCards; index++) {
+                    const double pickOffset = 18.0; // outward movement for revealed (selected) cards
+                    final double progress = index / (numCards - 1);
+                    final double theta = theta0 + (progress - 0.5) * sweepAngle + rotation;
+                    final bool isRevealed = _revealed[index];
+                    final double localRadius = radius + (isRevealed ? pickOffset : 0.0);
+                    // 复用预计算的基础 cos/sin，通过角度加法得到当前 cos/sin
+                    final double baseCos = _baseCos[index];
+                    final double baseSin = _baseSin[index];
+                    final double cosTheta = baseCos * cosR - baseSin * sinR;
+                    final double sinTheta = baseSin * cosR + baseCos * sinR;
+                    final double x = centerX + localRadius * cosTheta;
+                    final double y = centerY + localRadius * sinTheta;
+                    // 卡片矩形用于可视剔除（近似，旋转误差由 margin 吸收）
+                    final Rect cardRect = Rect.fromLTWH(
+                      x - cardWidth / 2,
+                      y - cardHeight / 2,
+                      cardWidth,
+                      cardHeight,
+                    );
+                    if (!viewport.overlaps(cardRect)) {
+                      // 跳过不可见卡片，减少布局与绘制开销
+                      continue;
+                    }
 
-                // 卡片主体
-                cardChildren.add(Positioned(
-                  left: x - cardWidth / 2,
-                  top: y - cardHeight / 2,
-                  child: Transform(
-                    transform: Matrix4.identity()..rotateZ(theta - math.pi / 2),
-                    alignment: FractionalOffset.center,
-                    child: _ArcDeckCard(
-                      face: widget.faces[index],
-                      width: cardWidth,
-                      height: cardHeight,
-                      onTap: () {
-                        if (!isRevealed) {
-                          final bool accepted = widget.onPick(widget.faces[index]);
-                          if (accepted) {
-                            setState(() {
-                              _revealed[index] = true;
-                              _drawOrder[index] = _acceptedCount + 1;
-                              _acceptedCount++;
-                            });
-                          }
-                        }
-                      },
-                      highlight: isRevealed,
-                      isRevealed: isRevealed,
-                    ),
-                  ),
-                ));
+                    // 卡片主体
+                    cardChildren.add(Positioned(
+                      left: x - cardWidth / 2,
+                      top: y - cardHeight / 2,
+                      child: Transform.rotate(
+                        angle: theta - math.pi / 2,
+                        child: _ArcDeckCard(
+                          face: widget.faces[index],
+                          width: cardWidth,
+                          height: cardHeight,
+                          reversed: _reversed[index],
+                          onTap: () {
+                            // 单击即抽牌，并在抽牌成功后短暂播放预览动画
+                            if (!isRevealed) {
+                              final int nextOrder = _acceptedCount + 1;
+                              final bool accepted = widget.onPick(
+                                _PickEvent(
+                                  face: widget.faces[index],
+                                  reversed: _reversed[index],
+                                  order: nextOrder,
+                                  index: index,
+                                ),
+                              );
+                              if (accepted) {
+                                setState(() {
+                                  _revealed[index] = true;
+                                  _drawOrder[index] = nextOrder;
+                                  _acceptedCount++;
+                                });
+                               }
+                            }
+                          },
+                          onLongPress: null,
+                          highlight: isRevealed,
+                          isRevealed: isRevealed,
+                        ),
+                      ),
+                    ));
 
                 // 翻开后在更外层圆环上显示卡名与正逆位（圆形排列）
                 if (isRevealed) {
@@ -671,17 +915,26 @@ class _PickDeckStripState extends State<_PickDeckStrip>
                   const double labelWidth = 150.0;
                   const double labelHeight = 34.0;
                   final double outerR = localRadius + cardHeight / 2 + ringMargin; // 外层圆环半径
-                  final double lx = centerX + outerR * math.cos(theta);
-                  final double ly = centerY + outerR * math.sin(theta);
+                  final double lx = centerX + outerR * (baseCos * cosR - baseSin * sinR);
+                  final double ly = centerY + outerR * (baseSin * cosR + baseCos * sinR);
+                  final Rect labelRect = Rect.fromLTWH(
+                    lx - labelWidth / 2,
+                    ly - labelHeight / 2,
+                    labelWidth,
+                    labelHeight,
+                  );
+                  if (!viewport.overlaps(labelRect)) {
+                    // 标签不可见则跳过绘制
+                    continue;
+                  }
 
                   labelChildren.add(Positioned(
                     left: lx - labelWidth / 2,
                     top: ly - labelHeight / 2,
                     child: IgnorePointer(
-                      child: Transform(
+                      child: Transform.rotate(
                         // 将文字方向反转（在切线方向上旋转 180°）
-                        transform: Matrix4.identity()..rotateZ(theta + math.pi / 2),
-                        alignment: FractionalOffset.center,
+                        angle: theta + math.pi / 2,
                         child: Container(
                           width: labelWidth,
                           height: labelHeight,
@@ -717,33 +970,41 @@ class _PickDeckStripState extends State<_PickDeckStrip>
                   ));
                 }
               }
-              // 先渲染卡片，再渲染外层标签，确保标签层级更外
-              return [
-                ...cardChildren,
-                ...labelChildren,
-              ];
-            }(),
+                // 先渲染卡片，再渲染外层标签，确保标签层级更外
+                return [
+                  ...cardChildren,
+                  ...labelChildren,
+                  // 预览动画已抽离为独立组件，不再在此构建
+                ];
+              }()
+            );
+            },
           ),
 
         );
       },
     );
   }
+
 }
 
 class _ArcDeckCard extends StatelessWidget {
   final _Face face;
   final double width;
   final double height;
+  final bool reversed;
   final bool highlight;
   final bool isRevealed;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   const _ArcDeckCard(
       {required this.face,
       required this.width,
       required this.height,
       required this.onTap,
+      required this.reversed,
+      this.onLongPress,
       this.highlight = false,
       this.isRevealed = false});
 
@@ -752,6 +1013,7 @@ class _ArcDeckCard extends StatelessWidget {
     final theme = Theme.of(context);
     return GestureDetector(
       onTap: isRevealed ? null : onTap, // 已翻开的牌不能再次点击
+      onLongPress: isRevealed ? null : onLongPress,
       child: SizedBox(
         width: width,
         height: height,
@@ -760,33 +1022,19 @@ class _ArcDeckCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border:                Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
             boxShadow: [
-              // 增强基础阴影效果，使其更具立体感
+              // 单层基础阴影，降低混合与图层数量
               BoxShadow(
                 color: Colors.black.withOpacity(0.15),
-                blurRadius: 12,
-                spreadRadius: 2,
+                blurRadius: 10,
+                spreadRadius: 1,
                 offset: const Offset(0, 2),
               ),
               if (highlight)
-                // 添加多层发光效果，营造金色外发光
+                // 单层金色发光，保持风格同时降低性能开销
                 BoxShadow(
-                  color: Colors.amber.withOpacity(0.4),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                  offset: const Offset(0, 0),
-                ),
-              if (highlight)
-                BoxShadow(
-                  color: Colors.amber.withOpacity(0.3),
-                  blurRadius: 30,
-                  spreadRadius: 8,
-                  offset: const Offset(0, 0),
-                ),
-              if (highlight)
-                BoxShadow(
-                  color: Colors.amber.withOpacity(0.2),
-                  blurRadius: 40,
-                  spreadRadius: 12,
+                  color: Colors.amber.withOpacity(0.38),
+                  blurRadius: 18,
+                  spreadRadius: 4,
                   offset: const Offset(0, 0),
                 ),
             ],
@@ -798,16 +1046,19 @@ class _ArcDeckCard extends StatelessWidget {
               if (!isRevealed)
                 const _TarotCardBack()
               else
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    // 去除半透明，使用卡牌纯色背景
-                    color: face.color,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      face.label,
-                      style: theme.textTheme.labelSmall,
+                Transform.rotate(
+                  angle: reversed ? math.pi : 0,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      // 去除半透明，使用卡牌纯色背景
+                      color: face.color,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        face.label,
+                        style: theme.textTheme.labelSmall,
+                      ),
                     ),
                   ),
                 ),
@@ -824,9 +1075,20 @@ class _TarotCardBack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const bool usePng = false; // 如需切换为 PNG，请置为 true 并添加资源
+    if (usePng) {
+      return Image.asset(
+        'assets/images/tarot_back.png',
+        fit: BoxFit.fill,
+        filterQuality: FilterQuality.low,
+      );
+    }
     return SvgPicture.asset(
       'assets/images/tarot_back.svg',
       fit: BoxFit.fill,
+      alignment: Alignment.center,
+      allowDrawingOutsideViewBox: false,
+      excludeFromSemantics: true,
     );
   }
 }
@@ -998,134 +1260,7 @@ class _SpreadGridFillMock extends StatelessWidget {
   }
 }
 
-// 自定义吸附模拟，确保每次滚动都停在一张牌的中心位置
-class _SnapScrollPhysics extends ScrollPhysics {
-  final double itemExtent;
-  final double viewportWidth;
-
-  const _SnapScrollPhysics(
-      {required this.itemExtent,
-      required this.viewportWidth,
-      ScrollPhysics? parent})
-      : super(parent: parent);
-
-  @override
-  _SnapScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return _SnapScrollPhysics(
-      itemExtent: itemExtent,
-      viewportWidth: viewportWidth,
-      parent: buildParent(ancestor),
-    );
-  }
-
-  @override
-  Simulation? createBallisticSimulation(
-      ScrollMetrics position, double velocity) {
-    // 调整速度阈值，使滚动吸附更灵敏
-    // 当速度较小时，仍然可能需要创建吸附模拟以确保准确居中
-    if (velocity.abs() < 50) {
-      // 即使速度很小，也创建吸附模拟以确保精确居中
-      return _SnapSimulation(
-        position: position.pixels,
-        velocity: velocity,
-        extent: position.maxScrollExtent,
-        itemExtent: itemExtent,
-        viewportWidth: viewportWidth,
-      );
-    }
-
-    return _SnapSimulation(
-      position: position.pixels,
-      velocity: velocity,
-      extent: position.maxScrollExtent,
-      itemExtent: itemExtent,
-      viewportWidth: viewportWidth,
-    );
-  }
-
-  @override
-  bool get allowImplicitScrolling => false;
-
-  @override
-  double applyBoundaryConditions(ScrollMetrics position, double value) {
-    // 确保不会越过边界
-    if (value < position.minScrollExtent)
-      return position.minScrollExtent - value;
-    if (value > position.maxScrollExtent)
-      return value - position.maxScrollExtent;
-    return 0.0;
-  }
-}
-
-// 自定义吸附模拟，确保滚动停在最近的卡片中心
-class _SnapSimulation extends Simulation {
-  final double position;
-  final double velocity;
-  final double extent;
-  final double itemExtent;
-  final double viewportWidth;
-  final double targetPosition;
-  final double _duration;
-
-  _SnapSimulation({
-    required this.position,
-    required this.velocity,
-    required this.extent,
-    required this.itemExtent,
-    required this.viewportWidth,
-  })  : _duration = 0.25, // 调整动画时间到250ms，使滚动更加流畅
-        // 计算目标位置，确保选中的卡片居中显示
-        targetPosition = _calculateTargetPosition(
-            position, itemExtent, viewportWidth, extent);
-
-  // 计算目标位置的静态方法
-  static double _calculateTargetPosition(
-      double position, double itemExtent, double viewportWidth, double extent) {
-    // 计算当前视口中心位置对应的卡片索引
-    final double viewportCenter = position + viewportWidth / 2;
-    final int centerCardIndex = (viewportCenter / itemExtent).round();
-
-    // 计算中心卡片应该居中的位置
-    final double targetOffset =
-        centerCardIndex * itemExtent - viewportWidth / 2 + itemExtent / 2;
-
-    // 确保在边界范围内
-    return targetOffset.clamp(0.0, extent);
-  }
-
-  @override
-  double x(double time) {
-    // 使用与ScrollEndNotification一致的动画时间，确保动画效果平滑
-    final double t = (time / _duration).clamp(0.0, 1.0);
-    final double easedT = _easeOutCubic(t);
-
-    // 计算当前位置到目标位置的插值
-    // 确保动画开始和结束位置准确无误
-    final double result = lerpDouble(position, targetPosition, easedT)!;
-
-    // 确保结果在有效范围内
-    return result.clamp(0.0, extent);
-  }
-
-  @override
-  double dx(double time) {
-    // 计算速度
-    final double dt = 0.016; // 约60fps
-    if (time + dt > duration) return 0.0;
-    return (x(time + dt) - x(time)) / dt;
-  }
-
-  @override
-  bool isDone(double time) => time >= _duration;
-
-  @override
-  double get duration => _duration;
-
-  // 缓动函数
-  double _easeOutCubic(double t) {
-    return 1.0 - math.pow(1.0 - t, 3.0);
-  }
-}
+//（已移除吸附居中物理与模拟）
 
 // 横向滚动的拖拽行为：允许鼠标与触控设备进行拖拽滚动
 class _HScrollBehavior extends MaterialScrollBehavior {

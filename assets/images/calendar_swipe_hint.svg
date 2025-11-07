@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="34" viewBox="0 0 260 34">
+  <defs>
+    <linearGradient id="goldGrad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7D87A"/>
+      <stop offset="50%" stop-color="#E9C75C"/>
+      <stop offset="100%" stop-color="#D4AF37"/>
+    </linearGradient>
+  </defs>
+  <!-- 英文手写艺术字：Swipe down to open calendar（居中布局） -->
+  <text x="50%" y="70%" text-anchor="middle" font-size="22" letter-spacing="1.2"
+        fill="url(#goldGrad2)" stroke="#6A4B0A" stroke-width="1" paint-order="stroke fill"
+        font-family="Brush Script MT, Snell Roundhand, Apple Chancery, Segoe Script, Lucida Handwriting, Pacifico, cursive">
+    Swipe down to open calendar
+  </text>
+</svg>

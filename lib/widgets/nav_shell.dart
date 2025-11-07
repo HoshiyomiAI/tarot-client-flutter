@@ -30,23 +30,54 @@ class NavShell extends StatelessWidget {
     final loc = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexForLocation(loc);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tarot Minimal'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () => context.push('/calendar'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
-          ),
-        ],
+      // 移除整个标题栏，仅在首页保留右上角“打开日历”引导入口
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(child: child),
+            if (currentIndex == 1)
+              Positioned(
+                top: 10,
+                right: 12,
+                child: _CalendarHint(),
+              ),
+          ],
+        ),
       ),
-      body: SafeArea(child: child),
       bottomNavigationBar: _BottomNav(
         currentIndex: currentIndex,
         onTap: (i) => _goForIndex(context, i),
+      ),
+    );
+  }
+}
+
+class _CalendarHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () => GoRouter.of(context).push('/calendar'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2436).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.calendar_month, color: Colors.white, size: 18),
+              SizedBox(width: 6),
+              Text('打开日历', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
       ),
     );
   }

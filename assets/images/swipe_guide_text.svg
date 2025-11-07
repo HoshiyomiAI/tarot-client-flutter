@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="240" height="40" viewBox="0 0 240 40">
+  <defs>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7D87A"/>
+      <stop offset="50%" stop-color="#E9C75C"/>
+      <stop offset="100%" stop-color="#D4AF37"/>
+    </linearGradient>
+    <!-- 上拱形弧线：沿弧排版，更具仪式感 -->
+    <path id="arc" d="M12 26 Q 120 8 228 26" />
+  </defs>
+  <!-- 英文手写艺术字：Swipe to move（手写体+描边+金色渐变+柔光） -->
+  <text font-size="26" letter-spacing="1"
+        fill="url(#goldGrad)" stroke="#6A4B0A" stroke-width="1.2" paint-order="stroke fill"
+        font-family="Brush Script MT, Snell Roundhand, Apple Chancery, Segoe Script, Lucida Handwriting, Pacifico, cursive">
+    <textPath xlink:href="#arc" startOffset="50%" text-anchor="middle">Swipe to move</textPath>
+  </text>
+</svg>

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../shared/spreads.dart';
 import '../widgets/draw_modal/draw_modal.dart';
@@ -16,7 +19,8 @@ class ChatInit {
 
 class ChatScreen extends StatefulWidget {
   final ChatInit? init;
-  const ChatScreen({super.key, this.init});
+  final String? threadId;
+  const ChatScreen({super.key, this.init, this.threadId});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -47,41 +51,28 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final List<_ChatMessage> _messages = [];
+  late String _threadId;
+  static const String _lastThreadKey = 'chat_last_thread_v1';
+  static const String _threadsKey = 'chat_threads_v1';
+  String _threadKey(String id) => 'chat_thread_${id}_v1';
 
   @override
   void initState() {
     super.initState();
-    // 若携带初始化数据：以新对话形式预填充情景与抽牌结果
-    final init = widget.init;
-    if (init != null) {
-      // 用户提出的问题
-      if (init.question != null && init.question!.trim().isNotEmpty) {
-        _appendMessage(_ChatMessage(role: 'user', text: init.question!.trim()));
-      }
-      // 情景分析
-      if (init.analysis != null && init.analysis!.isNotEmpty) {
-        final lines = init.analysis!;
-        final text = '情景分析：\n' + lines.map((e) => '• $e').join('\n');
-        _appendMessage(_ChatMessage(role: 'assistant', text: text));
-      }
-      // 抽牌结果（包含牌阵标题与排列）
-      final res = init.spreadResult;
-      if (res != null && res.cards.isNotEmpty) {
-        final cards =
-            res.cards.map((r) => _TarotCard(r.name, r.reversed)).toList();
-        final summary = cards
-            .asMap()
-            .entries
-            .map((e) =>
-                '${e.key + 1}.${e.value.name}${e.value.reversed ? '(逆位)' : '(正位)'}')
-            .join('  ');
-        _appendMessage(_ChatMessage(
-          role: 'assistant',
-          text: '抽牌结果（牌阵：${res.spreadTitle}，共${res.count}张）：\n$summary',
-          draw: cards,
-          spreadTitle: res.spreadTitle,
-        ));
-      }
+    _threadId = widget.threadId ?? 'default';
+    _loadMessages();
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当路由参数中的线程ID发生变化时，刷新当前消息
+    if (oldWidget.threadId != widget.threadId) {
+      setState(() {
+        _threadId = widget.threadId ?? 'default';
+        _messages.clear();
+      });
+      _loadMessages();
     }
   }
 
@@ -104,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _appendMessage(_ChatMessage m) {
     setState(() => _messages.add(m));
+    _saveMessages();
     // 延迟滚动到底部
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
@@ -114,6 +106,169 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     });
+  }
+
+  Future<void> _saveMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = _messages.map((m) => _messageToJson(m)).toList();
+      final s = jsonEncode(list);
+      await prefs.setString(_threadKey(_threadId), s);
+      await prefs.setString(_lastThreadKey, _threadId);
+      await _updateThreadMeta(prefs);
+    } catch (_) {}
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // 若未指定线程，优先加载最近使用的线程
+      if (widget.threadId == null) {
+        final last = prefs.getString(_lastThreadKey);
+        if (last != null && last.isNotEmpty) {
+          _threadId = last;
+        }
+      }
+      // 记录最近使用的对话ID
+      await prefs.setString(_lastThreadKey, _threadId);
+      // 迁移：若仍存在旧全局历史，迁移到默认线程
+      if (_threadId == 'default') {
+        final legacy = prefs.getString('chat_history_v1');
+        final existsNew = prefs.getString(_threadKey(_threadId));
+        if (legacy != null && existsNew == null) {
+          await prefs.setString(_threadKey(_threadId), legacy);
+          await _updateThreadMeta(prefs);
+        }
+      }
+      final s = prefs.getString(_threadKey(_threadId));
+      if (s != null && s.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(s);
+        final msgs = list
+            .whereType<Map<String, dynamic>>()
+            .map((j) => _messageFromJson(j))
+            .toList();
+        setState(() {
+          _messages.clear();
+          _messages.addAll(msgs);
+        });
+      } else {
+        // 新对话或无记录时，清空显示，避免残留旧对话内容
+        setState(() {
+          _messages.clear();
+        });
+      }
+    } catch (_) {}
+    _applyInit();
+  }
+
+  Future<void> _updateThreadMeta(SharedPreferences prefs) async {
+    final now = DateTime.now();
+    String title = '对话';
+    String? lastText;
+    if (_messages.isNotEmpty) {
+      title = (_messages.first.text.trim().isNotEmpty)
+          ? _messages.first.text.trim()
+          : title;
+      lastText = _messages.last.text.trim();
+    }
+    Map<String, dynamic> meta = {
+      'id': _threadId,
+      'title': title.length > 20 ? title.substring(0, 20) : title,
+      'lastText': lastText,
+      'updatedAt': now.toIso8601String(),
+    };
+    List<dynamic> list = [];
+    final s = prefs.getString(_threadsKey);
+    if (s != null && s.isNotEmpty) {
+      try {
+        list = jsonDecode(s);
+      } catch (_) {}
+    }
+    bool replaced = false;
+    for (int i = 0; i < list.length; i++) {
+      final m = list[i];
+      if (m is Map && m['id'] == _threadId) {
+        list[i] = meta;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) list.add(meta);
+    await prefs.setString(_threadsKey, jsonEncode(list));
+  }
+
+  void _applyInit() {
+    final init = widget.init;
+    // 仅在新会话（当前无消息）且存在初始化内容时注入
+    if (init == null) return;
+    if (_messages.isNotEmpty) return;
+    if (init.question != null && init.question!.trim().isNotEmpty) {
+      _appendMessage(_ChatMessage(role: 'user', text: init.question!.trim()));
+    }
+    if (init.analysis != null && init.analysis!.isNotEmpty) {
+      final lines = init.analysis!;
+      final text = '情景分析：\n' + lines.map((e) => '• $e').join('\n');
+      _appendMessage(_ChatMessage(role: 'assistant', text: text));
+    }
+    final res = init.spreadResult;
+    if (res != null && res.cards.isNotEmpty) {
+      final cards = res.cards.map((r) => _TarotCard(r.name, r.reversed)).toList();
+      final summary = cards
+          .asMap()
+          .entries
+          .map((e) => '${e.key + 1}.${e.value.name}${e.value.reversed ? '(逆位)' : '(正位)'}')
+          .join('  ');
+      _appendMessage(_ChatMessage(
+        role: 'assistant',
+        text: '抽牌结果（牌阵：${res.spreadTitle}，共${res.count}张）：\n$summary',
+        draw: cards,
+        spreadTitle: res.spreadTitle,
+      ));
+    }
+  }
+
+  Map<String, dynamic> _cardToJson(_TarotCard c) {
+    return {
+      'name': c.name,
+      'reversed': c.reversed,
+    };
+  }
+
+  _TarotCard _cardFromJson(Map<String, dynamic> j) {
+    return _TarotCard(
+      (j['name'] ?? '') as String,
+      (j['reversed'] ?? false) as bool,
+    );
+  }
+
+  Map<String, dynamic> _messageToJson(_ChatMessage m) {
+    return {
+      'role': m.role,
+      'text': m.text,
+      'time': m.time.toIso8601String(),
+      'draw': m.draw?.map(_cardToJson).toList(),
+      'spreadTitle': m.spreadTitle,
+    };
+  }
+
+  _ChatMessage _messageFromJson(Map<String, dynamic> j) {
+    final drawList = j['draw'] as List?;
+    List<_TarotCard>? draw;
+    if (drawList != null) {
+      draw = drawList
+          .whereType<Map<String, dynamic>>()
+          .map(_cardFromJson)
+          .toList();
+    }
+    final timeStr = j['time'] as String?;
+    final time = timeStr != null ? DateTime.tryParse(timeStr) : null;
+    return _ChatMessage(
+      role: (j['role'] ?? 'assistant') as String,
+      text: (j['text'] ?? '') as String,
+      time: time,
+      draw: draw,
+      spreadTitle: j['spreadTitle'] as String?,
+    );
   }
 
   void _openDrawModal() async {
@@ -252,6 +407,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 onPressed: _openDrawModal,
                 icon: const Icon(Icons.style, size: 18),
                 label: const Text('抽卡'),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  context.push('/history');
+                },
+                icon: const Icon(Icons.history, size: 18),
+                label: const Text('历史记录'),
               ),
             ],
           ),

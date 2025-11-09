@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
 import '../widgets/draw_modal/draw_modal.dart';
 import 'chat.dart';
@@ -37,6 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _triggered = true;
       context.push('/calendar');
     }
+  }
+
+  String _newThreadId() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final rnd = math.Random().nextInt(1000000);
+    return 't${now}_$rnd';
   }
 
   void _onPanEnd(DragEndDetails details) {
@@ -141,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
         scenarioDesc: scenario.desc,
         spreadResult: res,
       );
-      context.push('/chat', extra: init);
+      final tid = _newThreadId();
+      context.push('/chat?t=${Uri.encodeComponent(tid)}', extra: init);
     }
   }
 }

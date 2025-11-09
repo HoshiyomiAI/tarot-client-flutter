@@ -8,6 +8,7 @@ import 'screens/calendar.dart';
 import 'screens/settings.dart';
 import 'screens/detail.dart';
 import 'widgets/nav_shell.dart';
+import 'screens/history.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -29,7 +30,17 @@ GoRouter createRouter() {
             path: '/chat',
             name: 'chat',
             pageBuilder: (context, state) => NoTransitionPage<void>(
-              child: ChatScreen(init: state.extra as ChatInit?),
+              child: ChatScreen(
+                init: state.extra as ChatInit?,
+                threadId: state.uri.queryParameters['t'],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/history',
+            name: 'history',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: HistoryScreen(),
             ),
           ),
           GoRoute(

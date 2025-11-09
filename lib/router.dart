@@ -28,8 +28,8 @@ GoRouter createRouter() {
           GoRoute(
             path: '/chat',
             name: 'chat',
-            pageBuilder: (context, state) => const NoTransitionPage<void>(
-              child: ChatScreen(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              child: ChatScreen(init: state.extra as ChatInit?),
             ),
           ),
           GoRoute(

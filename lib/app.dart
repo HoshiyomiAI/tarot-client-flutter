@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'router.dart';
 
 class TarotApp extends StatelessWidget {
@@ -10,6 +11,7 @@ class TarotApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Tarot Minimal',
       routerConfig: router,
+      scrollBehavior: const AppScrollBehavior(),
       themeMode: ThemeMode.dark,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF9E83FF),
@@ -30,3 +32,18 @@ class TarotApp extends StatelessWidget {
   }
 }
 
+// 全局滚动行为：移除过度滚动的水波纹/辉光，并允许触控/鼠标/触控笔拖拽
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+      };
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+    // 移除默认的辉光效果，保持沉稳的移动端滚动体验
+    return child;
+  }
+}

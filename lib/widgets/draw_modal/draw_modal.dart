@@ -3,6 +3,8 @@ import 'package:flutter/gestures.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart';
+import '../../shared/spreads.dart';
 
 /// 抽卡结果（公开给外部消费）
 class DrawCardResult {
@@ -20,8 +22,16 @@ class DrawSpreadResult {
 }
 
 /// 抽卡弹窗：返回抽取到的结果列表（取消返回 null）
+class DrawScenario {
+  final String title; // 情景/主题，如“爱情占卜”
+  final String? desc; // 简要描述
+  final List<String>? analysis; // 要点分析（可选）
+  final String? preferredSpreadTitle; // 优先牌阵标题（可选）
+  const DrawScenario({required this.title, this.desc, this.analysis, this.preferredSpreadTitle});
+}
+
 class DrawModal {
-  static Future<DrawSpreadResult?> show(BuildContext context) async {
+  static Future<DrawSpreadResult?> show(BuildContext context, {DrawScenario? scenario}) async {
     return await showModalBottomSheet<DrawSpreadResult?>(
       context: context,
       useRootNavigator: true,
@@ -30,7 +40,7 @@ class DrawModal {
       barrierColor: Colors.black.withOpacity(0.45),
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return const _DrawModalSheet();
+        return _DrawModalSheet(scenario: scenario);
       },
     );
   }
@@ -51,21 +61,14 @@ const List<String> _mockAnalysis = [
   '建议先采用三张牌的关系发展牌阵进行初步洞察。',
 ];
 
-const List<_SpreadMock> _mockSpreads = [
-  _SpreadMock('三张牌', '过去-现在-未来', 3),
-  _SpreadMock('五张牌', '现状-挑战-建议-外力-结果', 5),
-  _SpreadMock('凯尔特十字', '经典综合解析', 10),
-  _SpreadMock('七点马蹄', '行动-阻碍-资源-关系-转折-建议-结果', 7),
-  _SpreadMock('关系六点', '你-TA-现状-阻碍-建议-结果', 6),
-  _SpreadMock('事业四象限', '目标-优势-劣势-行动', 4),
-  _SpreadMock('决策两选一', '选项A-选项B-对比-结论', 4),
-  _SpreadMock('月度洞察', '上旬-中旬-下旬-整体建议', 4),
-  _SpreadMock('九宫格', '综合九项维度观测', 9),
-  _SpreadMock('金字塔八点', '基础-现状-阻碍-资源-机会-行动-外力-结果', 8),
+final List<_SpreadMock> _mockSpreads = [
+  for (final s in SpreadRegistry.spreads)
+    _SpreadMock(s.title, s.desc, s.cards),
 ];
 
 class _DrawModalSheet extends StatefulWidget {
-  const _DrawModalSheet();
+  final DrawScenario? scenario;
+  const _DrawModalSheet({this.scenario});
 
   @override
   State<_DrawModalSheet> createState() => _DrawModalSheetState();
@@ -73,11 +76,10 @@ class _DrawModalSheet extends StatefulWidget {
 
 class _DrawModalSheetState extends State<_DrawModalSheet> {
   int _step = 0; // 0: Step1, 1: Step2
-  _SpreadMock _selectedSpread = _mockSpreads.first; // 可变：支持在第一页选择牌阵
-  List<bool> _revealed = List<bool>.filled(_mockSpreads.first.cards, false);
+  late _SpreadMock _selectedSpread; // 在 initState 中初始化，可根据情景设定默认牌阵
+  late List<bool> _revealed;
   // Step2：按所选牌阵的卡位进行抽取，记录已选卡（含正/逆位与顺序）
-  late List<_PickedCard?> _pickedCards =
-      List<_PickedCard?>.filled(_selectedSpread.cards, null);
+  late List<_PickedCard?> _pickedCards;
   final List<_Face> _deckFaces = _buildMockDeckFaces();
 
   bool get _allRevealed => _revealed.every((v) => v);
@@ -99,6 +101,15 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
   @override
   void initState() {
     super.initState();
+    // 默认牌阵：优先使用情景指定的牌阵标题，否则使用第一个
+    final String? preferred = widget.scenario?.preferredSpreadTitle;
+    final int idx = preferred == null
+        ? 0
+        : _mockSpreads.indexWhere((s) => s.title.contains(preferred));
+    _selectedSpread = idx >= 0 ? _mockSpreads[idx] : _mockSpreads.first;
+    _revealed = List<bool>.filled(_selectedSpread.cards, false);
+    _pickedCards = List<_PickedCard?>.filled(_selectedSpread.cards, null);
+
     // 每次进入页面：打乱底部牌堆顺序
     _deckFaces.shuffle(math.Random());
   }
@@ -253,9 +264,15 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
                             ),
                           ),
                           onPressed: _step == 0
-                              ? () => setState(() => _step = 1)
+                              ? () {
+                                  HapticFeedback.lightImpact();
+                                  setState(() => _step = 1);
+                                }
                               : (canFinish
-                                  ? () => Navigator.of(context).pop(_buildResults())
+                                  ? () {
+                                      HapticFeedback.mediumImpact();
+                                      Navigator.of(context).pop(_buildResults());
+                                    }
                                   : null),
                           child: Text(
                             _step == 0 ? '继续' : '完成',
@@ -283,14 +300,20 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
               EdgeInsets.symmetric(horizontal: 16, vertical: 8 * spacingScale),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              if (widget.scenario?.desc != null)
+                _SectionCard(
+                    title: '占卜情景',
+                    child: Text(widget.scenario!.desc!),
+                    paddingScale: spacingScale),
+              SizedBox(height: 16 * spacingScale),
               _SectionCard(
                   title: '问题',
-                  child: const _QuestionMock(),
+                  child: _QuestionMock(question: widget.scenario?.title ?? _mockQuestion),
                   paddingScale: spacingScale),
               SizedBox(height: 16 * spacingScale),
               _SectionCard(
                   title: '问题分析',
-                  child: const _AnalysisMock(),
+                  child: _AnalysisMock(lines: widget.scenario?.analysis ?? _mockAnalysis),
                   paddingScale: spacingScale),
               SizedBox(height: 16 * spacingScale),
             ]),
@@ -357,7 +380,7 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
             flex: 3,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final double deadZone = 28 * spacingScale; // 底部保留不可触发区域
+                final double deadZone = constraints.maxHeight * 0.05; // 底部保留不可触发区域，按高度比例
                 return Stack(
                   children: [
                     // 扩大手势触发范围：让牌堆手势覆盖下半部分大区域，排除底部deadZone
@@ -532,6 +555,7 @@ class _SpreadSlotsView extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final positions = _positionsForSpread(spread);
+          final labels = SpreadRegistry.labelsForTitle(spread.title, spread.cards);
           final int n = spread.cards;
           // 当前将被选中的卡位：第一个为空的位置
           final int nextIndex = slots.indexWhere((f) => f == null);
@@ -561,7 +585,7 @@ class _SpreadSlotsView extends StatelessWidget {
                   width: slotWidth,
                   height: slotHeight,
                   child: slots[i] == null
-                      ? _EmptySlot(highlight: i == nextIndex)
+                      ? _EmptySlot(label: (i < labels.length) ? labels[i] : null, highlight: i == nextIndex)
                       : _FaceCard(
                           face: slots[i]!.face,
                           reversed: slots[i]!.reversed,
@@ -578,7 +602,7 @@ class _SpreadSlotsView extends StatelessWidget {
                         slotHeight / 2,
                     width: slotWidth,
                     height: slotHeight,
-                    child: _EmptySlot(highlight: i == nextIndex),
+                    child: _EmptySlot(label: (i < labels.length) ? labels[i] : null, highlight: i == nextIndex),
                   ),
             ],
           );
@@ -589,8 +613,9 @@ class _SpreadSlotsView extends StatelessWidget {
 }
 
 class _EmptySlot extends StatelessWidget {
+  final String? label;
   final bool highlight;
-  const _EmptySlot({this.highlight = false});
+  const _EmptySlot({this.label, this.highlight = false});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -619,7 +644,7 @@ class _EmptySlot extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      child: Text('待抽牌', style: Theme.of(context).textTheme.labelSmall),
+      child: Text(label ?? '待抽牌', style: Theme.of(context).textTheme.labelSmall),
     );
   }
 }
@@ -775,12 +800,17 @@ class _PickDeckStripState extends State<_PickDeckStrip>
     return LayoutBuilder(
       builder: (context, constraints) {
         // --- 2D Arc Geometry centered below horizontal middle ---
-        const cardWidth = 100.0;
-        const cardHeight = 160.0;
+        // 卡牌尺寸按比例缩放，适配不同屏幕宽度
+        final double cardWidth = constraints.maxWidth * 0.16; // 占宽度约 16%
+        final double cardHeight = cardWidth / 0.62; // 保持统一比例（宽/高≈0.62）
         final int numCards = widget.faces.length;
         final double centerX = constraints.maxWidth / 2;
-        final double centerY = constraints.maxHeight * 1.45; // move circle further down
-        final double radius = constraints.maxWidth * 0.90; // larger radius for looser spacing and wider rotation
+        // 统一垂直位置：将牌堆圆弧的“上沿基线”按高度百分比锚定
+        // 基线位置（central card 的 y = baselineY），随容器高度按比例变化
+        final double radius = constraints.maxWidth * 0.90; // 保持随宽度自适应的水平间距与旋转
+        const double baselineRatio = 0.38; // 圆弧上沿位于容器高度的 38%
+        final double baselineY = constraints.maxHeight * baselineRatio;
+        final double centerY = baselineY + radius; // 使 top-of-circle 位于 baselineY
         // Wider sweep to increase spacing between cards along the arc
         final double sweepAngle = math.pi * 1.5;
         // Top-of-circle baseline so the arc sits above the center (concave up)
@@ -826,7 +856,7 @@ class _PickDeckStripState extends State<_PickDeckStrip>
               final double cosR = math.cos(rotation);
               final double sinR = math.sin(rotation);
               // 视窗矩形，用于剔除不可见元素（包含边缘留白）
-              const double margin = 40.0;
+              final double margin = constraints.maxWidth * 0.06; // 相对宽度的留白
               final Rect viewport = Rect.fromLTWH(
                 -margin,
                 -margin,
@@ -840,7 +870,7 @@ class _PickDeckStripState extends State<_PickDeckStrip>
                   final List<Widget> cardChildren = [];
                   final List<Widget> labelChildren = []; // 确保标签在所有卡片之上渲染
                   for (int index = 0; index < numCards; index++) {
-                    const double pickOffset = 18.0; // outward movement for revealed (selected) cards
+                    final double pickOffset = cardWidth * 0.18; // 选中外移距离基于卡宽
                     final double progress = index / (numCards - 1);
                     final double theta = theta0 + (progress - 0.5) * sweepAngle + rotation;
                     final bool isRevealed = _revealed[index];
@@ -893,7 +923,8 @@ class _PickDeckStripState extends State<_PickDeckStrip>
                                   _drawOrder[index] = nextOrder;
                                   _acceptedCount++;
                                 });
-                               }
+                                HapticFeedback.selectionClick();
+                              }
                             }
                           },
                           onLongPress: null,
@@ -910,10 +941,10 @@ class _PickDeckStripState extends State<_PickDeckStrip>
                   final int? order = _drawOrder[index];
                   final String orderText = order == null ? '' : '第${order}张 · ';
                   final String labelText = '$orderText${widget.faces[index].label} · $orientationText';
-                  // 更外层圆环：从卡片外沿向外扩展，半径更大
-                  const double ringMargin = 40.0; // 与卡片边缘的额外间距
-                  const double labelWidth = 150.0;
-                  const double labelHeight = 34.0;
+                  // 更外层圆环：从卡片外沿向外扩展，半径更大（按比例）
+                  final double ringMargin = cardHeight * 0.25; // 与卡片边缘的间距按卡高比例
+                  final double labelWidth = cardWidth * 1.50; // 标签宽度按卡宽比例
+                  final double labelHeight = cardHeight * 0.22; // 标签高度按卡高比例
                   final double outerR = localRadius + cardHeight / 2 + ringMargin; // 外层圆环半径
                   final double lx = centerX + outerR * (baseCos * cosR - baseSin * sinR);
                   final double ly = centerY + outerR * (baseSin * cosR + baseCos * sinR);
@@ -1160,7 +1191,8 @@ class _BoxPlaceholder extends StatelessWidget {
 
 // 问题（Mock 展示，禁用输入样式）
 class _QuestionMock extends StatelessWidget {
-  const _QuestionMock();
+  final String question;
+  const _QuestionMock({required this.question});
 
   @override
   Widget build(BuildContext context) {
@@ -1172,17 +1204,15 @@ class _QuestionMock extends StatelessWidget {
         enabled: false,
         filled: true,
       ),
-      child: Text(
-        _mockQuestion,
-        style: theme.textTheme.bodyMedium,
-      ),
+      child: Text(question, style: theme.textTheme.bodyMedium),
     );
   }
 }
 
 // 分析（Mock 展示为要点列表）
 class _AnalysisMock extends StatelessWidget {
-  const _AnalysisMock();
+  final List<String> lines;
+  const _AnalysisMock({required this.lines});
 
   @override
   Widget build(BuildContext context) {
@@ -1190,7 +1220,7 @@ class _AnalysisMock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final line in _mockAnalysis)
+        for (final line in lines)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
@@ -1250,7 +1280,7 @@ class _SpreadGridFillMock extends StatelessWidget {
                 spread: item,
                 fill: true,
                 selected: isSelected,
-                onTap: () => onSelect?.call(item),
+                onTap: () { HapticFeedback.selectionClick(); onSelect?.call(item); },
               ),
             ),
           );
@@ -1377,6 +1407,7 @@ class _SpreadPreview extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final positions = _positionsForSpread(spread);
+          final labels = SpreadRegistry.labelsForTitle(spread.title, spread.cards);
           // 固定卡槽尺寸，适合 160 高度容器
           final double slotWidth = 44;
           // 正常卡牌比例：width / height ≈ 0.62，因此 height = width / 0.62
@@ -1391,7 +1422,7 @@ class _SpreadPreview extends StatelessWidget {
                       slotHeight / 2,
                   width: slotWidth,
                   height: slotHeight,
-                  child: _CardSlotPreview(label: '${i + 1}'),
+                  child: _CardSlotPreview(label: (i < labels.length && labels.isNotEmpty) ? labels[i] : '${i + 1}'),
                 ),
             ],
           );
@@ -1433,115 +1464,9 @@ class _Pos {
 }
 
 List<_Pos> _positionsForSpread(_SpreadMock spread) {
-  final t = spread.title;
-  final n = spread.cards;
-  // 三张牌：水平排列
-  if (t.contains('三') && n == 3) {
-    return const [
-      _Pos(0.15, 0.5),
-      _Pos(0.5, 0.5),
-      _Pos(0.85, 0.5),
-    ];
-  }
-  // 五张牌：水平排列五张（现状-挑战-建议-外力-结果）
-  if (t.contains('五') && n == 5) {
-    return const [
-      _Pos(0.1, 0.5),
-      _Pos(0.3, 0.5),
-      _Pos(0.5, 0.5),
-      _Pos(0.7, 0.5),
-      _Pos(0.9, 0.5),
-    ];
-  }
-  // 凯尔特十字：左侧十字 + 右侧权杖（7-10）
-  if (t.contains('凯尔特') && n == 10) {
-    return const [
-      _Pos(0.35, 0.50), // 1 中心
-      _Pos(0.35, 0.50), // 2 横置（示意：与1重叠附近）
-      _Pos(0.35, 0.70), // 3 下
-      _Pos(0.20, 0.50), // 4 左
-      _Pos(0.35, 0.30), // 5 上
-      _Pos(0.50, 0.50), // 6 右
-      _Pos(0.80, 0.75), // 7 权杖下
-      _Pos(0.80, 0.60), // 8
-      _Pos(0.80, 0.45), // 9
-      _Pos(0.80, 0.30), // 10 权杖上
-    ];
-  }
-  // 七点马蹄：对称马蹄形
-  if (t.contains('马蹄') && n == 7) {
-    return const [
-      _Pos(0.15, 0.65), // 左下
-      _Pos(0.25, 0.55), // 左中
-      _Pos(0.35, 0.45), // 左上
-      _Pos(0.50, 0.40), // 顶部中心
-      _Pos(0.65, 0.45), // 右上
-      _Pos(0.75, 0.55), // 右中
-      _Pos(0.85, 0.65), // 右下
-    ];
-  }
-  // 关系六点：两行各三张
-  if ((t.contains('关系') || n == 6) && n == 6) {
-    return const [
-      _Pos(0.20, 0.35),
-      _Pos(0.50, 0.35),
-      _Pos(0.80, 0.35),
-      _Pos(0.20, 0.65),
-      _Pos(0.50, 0.65),
-      _Pos(0.80, 0.65),
-    ];
-  }
-  // 四象限 / 两选一 / 月度洞察：2x2
-  if ((t.contains('四象限') || t.contains('两选一') || t.contains('月度')) && n == 4) {
-    return const [
-      _Pos(0.35, 0.35),
-      _Pos(0.65, 0.35),
-      _Pos(0.35, 0.65),
-      _Pos(0.65, 0.65),
-    ];
-  }
-  // 九宫格：3x3
-  if (t.contains('九宫') && n == 9) {
-    return const [
-      _Pos(0.20, 0.25),
-      _Pos(0.50, 0.25),
-      _Pos(0.80, 0.25),
-      _Pos(0.20, 0.50),
-      _Pos(0.50, 0.50),
-      _Pos(0.80, 0.50),
-      _Pos(0.20, 0.75),
-      _Pos(0.50, 0.75),
-      _Pos(0.80, 0.75),
-    ];
-  }
-  // 金字塔八点：1+2+3+2
-  if (t.contains('金字塔') && n == 8) {
-    return const [
-      _Pos(0.50, 0.20),
-      _Pos(0.35, 0.40),
-      _Pos(0.65, 0.40),
-      _Pos(0.25, 0.60),
-      _Pos(0.50, 0.60),
-      _Pos(0.75, 0.60),
-      _Pos(0.35, 0.80),
-      _Pos(0.65, 0.80),
-    ];
-  }
-  // 默认：水平排列 n 张，超出则自动压缩为换行
-  final List<_Pos> res = [];
-  final int perRow = n <= 5 ? n : 5;
-  final int rows = (n / perRow).ceil();
-  for (int r = 0; r < rows; r++) {
-    final int start = r * perRow;
-    final int end = (start + perRow).clamp(0, n);
-    final int count = end - start;
-    for (int i = 0; i < count; i++) {
-      final double x = 0.1 + (0.8 * (count == 1 ? 0.5 : i / (count - 1)));
-      final double y = rows == 1 ? 0.5 : (0.35 + r * 0.3);
-      res.add(_Pos(x, y));
-    }
-  }
-  return res;
+  final positions = SpreadRegistry.positionsForTitle(spread.title, spread.cards);
+  if (positions.isEmpty) return const [_Pos(0.5, 0.5)];
+  return positions.map((p) => _Pos(p.dx, p.dy)).toList();
 }
 
 class _CountBadge extends StatelessWidget {

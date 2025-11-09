@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 class NavShell extends StatelessWidget {
@@ -12,6 +13,7 @@ class NavShell extends StatelessWidget {
   }
 
   void _goForIndex(BuildContext context, int index) {
+    HapticFeedback.selectionClick();
     switch (index) {
       case 0:
         context.go('/chat');
@@ -153,7 +155,8 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double size = isCenter ? (selected ? 62 : 54) : 40;
+    // 调整尺寸，避免在受限高度内发生溢出
+    final double size = isCenter ? (selected ? 52 : 46) : 36;
     final Color fg = selected ? gold : grey;
     final List<BoxShadow> glow = selected
         ? [
@@ -187,8 +190,8 @@ class _NavItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 58, // 减少高度以避免溢出
-            width: isCenter ? 62 : 44,
+            height: isCenter ? 56 : 52,
+            width: isCenter ? 56 : 44,
             child: Center(
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
@@ -200,8 +203,8 @@ class _NavItem extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 4), // 减少间距
-          Text(label, style: TextStyle(color: fg, fontSize: 12)),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(color: fg, fontSize: 11)),
         ],
       ),
     );

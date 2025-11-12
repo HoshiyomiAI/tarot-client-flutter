@@ -31,7 +31,7 @@ class DrawScenario {
 }
 
 class DrawModal {
-  static Future<DrawSpreadResult?> show(BuildContext context, {DrawScenario? scenario}) async {
+  static Future<DrawSpreadResult?> show(BuildContext context, {DrawScenario? scenario, int initialStep = 0}) async {
     return await showModalBottomSheet<DrawSpreadResult?>(
       context: context,
       useRootNavigator: true,
@@ -40,7 +40,7 @@ class DrawModal {
       barrierColor: Colors.black.withOpacity(0.45),
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return _DrawModalSheet(scenario: scenario);
+        return _DrawModalSheet(scenario: scenario, initialStep: initialStep);
       },
     );
   }
@@ -68,14 +68,15 @@ final List<_SpreadMock> _mockSpreads = [
 
 class _DrawModalSheet extends StatefulWidget {
   final DrawScenario? scenario;
-  const _DrawModalSheet({this.scenario});
+  final int initialStep;
+  const _DrawModalSheet({this.scenario, this.initialStep = 0});
 
   @override
   State<_DrawModalSheet> createState() => _DrawModalSheetState();
 }
 
 class _DrawModalSheetState extends State<_DrawModalSheet> {
-  int _step = 0; // 0: Step1, 1: Step2
+  late int _step;
   late _SpreadMock _selectedSpread; // 在 initState 中初始化，可根据情景设定默认牌阵
   late List<bool> _revealed;
   // Step2：按所选牌阵的卡位进行抽取，记录已选卡（含正/逆位与顺序）
@@ -101,11 +102,18 @@ class _DrawModalSheetState extends State<_DrawModalSheet> {
   @override
   void initState() {
     super.initState();
+    _step = widget.initialStep;
     // 默认牌阵：优先使用情景指定的牌阵标题，否则使用第一个
     final String? preferred = widget.scenario?.preferredSpreadTitle;
-    final int idx = preferred == null
+    int idx = preferred == null
         ? 0
         : _mockSpreads.indexWhere((s) => s.title.contains(preferred));
+    if (widget.initialStep == 1) {
+      final dailyIdx = _mockSpreads.indexWhere((s) => s.title == '每日一张');
+      if (dailyIdx != -1) {
+        idx = dailyIdx;
+      }
+    }
     _selectedSpread = idx >= 0 ? _mockSpreads[idx] : _mockSpreads.first;
     _revealed = List<bool>.filled(_selectedSpread.cards, false);
     _pickedCards = List<_PickedCard?>.filled(_selectedSpread.cards, null);
@@ -1053,12 +1061,11 @@ class _ArcDeckCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border:                Border.all(color: theme.colorScheme.outline.withOpacity(0.35)),
             boxShadow: [
-              // 单层基础阴影，降低混合与图层数量
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 10,
-                spreadRadius: 1,
-                offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 2),
               ),
               if (highlight)
                 // 单层金色发光，保持风格同时降低性能开销

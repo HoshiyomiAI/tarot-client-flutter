@@ -9,6 +9,7 @@ import 'screens/settings.dart';
 import 'screens/detail.dart';
 import 'widgets/nav_shell.dart';
 import 'screens/history.dart';
+import 'screens/tarot_reading.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -76,6 +77,12 @@ GoRouter createRouter() {
         name: 'detail',
         builder: (context, state) => const DetailScreen(),
       ),
+      GoRoute(
+        path: '/reading',
+        name: 'reading',
+        builder: (context, state) => const TarotReadingScreen(),
+      ),
     ],
   );
 }
+

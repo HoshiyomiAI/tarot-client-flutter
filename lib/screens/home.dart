@@ -65,17 +65,20 @@ class _HomeScreenState extends State<HomeScreen> {
       onPanStart: _onPanStart,
       onPanUpdate: _onPanUpdate,
       onPanEnd: _onPanEnd,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _HeroBanner()),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-          const SliverToBoxAdapter(child: _DailyFortuneCard()),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          const SliverToBoxAdapter(child: _SectionTitle(title: '占卜仪式')),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          SliverToBoxAdapter(child: _RitualGrid(onSelect: _startRitual)),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _HeroBanner()),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            const SliverToBoxAdapter(child: _DailyFortuneCard()),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            const SliverToBoxAdapter(child: _SectionTitle(title: '占卜仪式')),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            SliverToBoxAdapter(child: _RitualGrid(onSelect: _startRitual)),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        ),
       ),
     );
   }
@@ -551,6 +554,7 @@ class _DailyFortuneCardState extends State<_DailyFortuneCard> {
       onTap: _handleTap,
       child: Container(
         height: 380,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: const Color(0xFF1E1A29),
           borderRadius: BorderRadius.circular(12),
@@ -710,40 +714,50 @@ class _RitualTile extends StatefulWidget {
 }
 
 class _RitualTileState extends State<_RitualTile> {
+  bool _hovered = false;
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     const Color accent = Color(0xFFFFD57A);
-    final Color glowColor = accent.withOpacity(_pressed ? 0.28 : 0.14);
+    final bool active = _hovered || _pressed;
+    final Color glowColor = accent.withOpacity(active ? 0.28 : 0.14);
     return AnimatedScale(
-      scale: _pressed ? 1.01 : 1.0,
+      scale: _pressed ? 0.98 : (_hovered ? 1.01 : 1.0),
       duration: const Duration(milliseconds: 120),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1A29),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            widget.onTap?.call();
+          },
+          onHover: (v) => setState(() => _hovered = v),
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) {
+            Future.delayed(const Duration(milliseconds: 120), () {
+              if (mounted) setState(() => _pressed = false);
+            });
+          },
+          onTapCancel: () => setState(() => _pressed = false),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 12, spreadRadius: 0, offset: const Offset(0, 2)),
-            BoxShadow(color: glowColor, blurRadius: 18, spreadRadius: 1),
-          ],
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              widget.onTap?.call();
-            },
-            onHighlightChanged: (v) => setState(() => _pressed = v),
-            borderRadius: BorderRadius.circular(12),
-            splashColor: accent.withOpacity(0.15),
-            highlightColor: accent.withOpacity(0.10),
+          splashColor: accent.withOpacity(0.15),
+          highlightColor: accent.withOpacity(0.10),
+          hoverColor: accent.withOpacity(0.06),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1A29),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 12, spreadRadius: 0, offset: const Offset(0, 2)),
+                BoxShadow(color: glowColor, blurRadius: 18, spreadRadius: 1),
+              ],
+            ),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 Container(

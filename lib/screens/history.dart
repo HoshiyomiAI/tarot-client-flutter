@@ -80,6 +80,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          final id = _newThreadId();
+          context.go('/chat?t=${Uri.encodeComponent(id)}');
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('新对话'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty

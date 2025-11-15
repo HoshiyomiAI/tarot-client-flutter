@@ -96,16 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _appendMessage(_ChatMessage m) {
     setState(() => _messages.add(m));
     _saveMessages();
-    // 延迟滚动到底部
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _scrollToBottom();
   }
 
   Future<void> _saveMessages() async {
@@ -151,6 +142,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.clear();
           _messages.addAll(msgs);
         });
+        _scrollToBottom();
       } else {
         // 新对话或无记录时，清空显示，避免残留旧对话内容
         setState(() {
@@ -159,6 +151,18 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (_) {}
     _applyInit();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _updateThreadMeta(SharedPreferences prefs) async {

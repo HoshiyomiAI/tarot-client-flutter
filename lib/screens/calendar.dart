@@ -107,6 +107,7 @@ class _CalendarPanelState extends State<_CalendarPanel> {
   final List<_DayRecord> _records = [];
   bool _loggedIn = false;
   final Set<int> _historyDays = <int>{};
+  int _switchDir = 0;
 
   @override
   void initState() {
@@ -155,6 +156,37 @@ class _CalendarPanelState extends State<_CalendarPanel> {
     _refreshLoginAndMonthHistory();
   }
 
+  void _prevDay() {
+    final d = _selected.subtract(const Duration(days: 1));
+    setState(() {
+      _switchDir = -1;
+      _selected = d;
+      _focused = DateTime(d.year, d.month);
+    });
+    _loadForSelected();
+    _refreshLoginAndMonthHistory();
+  }
+
+  void _nextDay() {
+    final d = _selected.add(const Duration(days: 1));
+    setState(() {
+      _switchDir = 1;
+      _selected = d;
+      _focused = DateTime(d.year, d.month);
+    });
+    _loadForSelected();
+    _refreshLoginAndMonthHistory();
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final dx = details.velocity.pixelsPerSecond.dx;
+    if (dx < -150) {
+      _nextDay();
+    } else if (dx > 150) {
+      _prevDay();
+    }
+  }
+
   String _weekdayLabel(int i) {
     const labels = ['周一','周二','周三','周四','周五','周六','周日'];
     return labels[i];
@@ -195,6 +227,9 @@ class _CalendarPanelState extends State<_CalendarPanel> {
               ),
             ],
           ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: _onHorizontalDragEnd,
           child: Stack(
             children: [
               Column(
@@ -295,60 +330,79 @@ class _CalendarPanelState extends State<_CalendarPanel> {
                   Text('当天历史记录', style: theme.textTheme.labelSmall?.copyWith(color: Colors.white60)),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: _records.isEmpty
-                        ? Center(
-                            child: Text('暂无记录', style: theme.textTheme.labelSmall?.copyWith(color: Colors.white38)),
-                          )
-                        : ListView.builder(
-                            padding: EdgeInsets.zero,
-                            itemCount: _records.length,
-                            itemBuilder: (context, index) {
-                              final r = _records[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                Navigator.of(context).pop();
-                                GoRouter.of(context).go('/chat?t=${Uri.encodeComponent(r.threadId)}');
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              splashColor: Colors.white.withOpacity(0.06),
-                              highlightColor: Colors.white.withOpacity(0.04),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1E1A29),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(r.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                                          const SizedBox(height: 4),
-                                          Text(r.preview, style: theme.textTheme.labelSmall?.copyWith(color: Colors.white70)),
-                                        ],
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      transitionBuilder: (child, animation) {
+                        final bool isIncoming = child.key == ValueKey<String>(_selected.toIso8601String());
+                        final double dir = _switchDir > 0 ? 1.0 : -1.0;
+                        final Offset begin = isIncoming ? Offset(dir, 0) : Offset(-dir, 0);
+                        final Animation<double> fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+                        final Animation<Offset> slide = animation.drive(
+                          Tween<Offset>(begin: begin, end: Offset.zero).chain(CurveTween(curve: Curves.easeOut)),
+                        );
+                        return FadeTransition(
+                          opacity: fade,
+                          child: SlideTransition(position: slide, child: child),
+                        );
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey<String>(_selected.toIso8601String()),
+                        child: _records.isEmpty
+                            ? Center(
+                                child: Text('暂无记录', style: theme.textTheme.labelSmall?.copyWith(color: Colors.white38)),
+                              )
+                            : ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: _records.length,
+                                itemBuilder: (context, index) {
+                                  final r = _records[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: InkWell(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          Navigator.of(context).pop();
+                                          GoRouter.of(context).go('/chat?t=${Uri.encodeComponent(r.threadId)}');
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        splashColor: Colors.white.withOpacity(0.06),
+                                        highlightColor: Colors.white.withOpacity(0.04),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF1E1A29),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
+                                          ),
+                                          padding: const EdgeInsets.all(12),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(r.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                                                    const SizedBox(height: 4),
+                                                    Text(r.preview, style: theme.textTheme.labelSmall?.copyWith(color: Colors.white70)),
+                                                  ],
+                                                ),
+                                              ),
+                                              Text(_fmtTime(r.time), style: theme.textTheme.labelSmall?.copyWith(color: Colors.white38)),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    Text(_fmtTime(r.time), style: theme.textTheme.labelSmall?.copyWith(color: Colors.white38)),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
-                            ),
-                          ),
-                        );
-                            },
-                          ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                    ],
+                  ),
               const Positioned(
                 left: 0,
                 right: 0,
@@ -356,6 +410,7 @@ class _CalendarPanelState extends State<_CalendarPanel> {
                 child: _BottomGuideIcon(),
               ),
             ],
+          ),
           ),
         ),
       ),

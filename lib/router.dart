@@ -10,6 +10,9 @@ import 'screens/detail.dart';
 import 'widgets/nav_shell.dart';
 import 'screens/history.dart';
 import 'screens/tarot_reading.dart';
+import 'screens/card_face.dart';
+import 'screens/account_login.dart';
+import 'screens/account_data.dart';
 
 GoRouter createRouter() {
   return GoRouter(
@@ -51,6 +54,41 @@ GoRouter createRouter() {
               child: ProfileScreen(),
             ),
           ),
+          GoRoute(
+            path: '/card-face',
+            name: 'card-face',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: CardFaceScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/card-face/front',
+            name: 'card-face-front',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: CardFaceFrontScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/card-face/back',
+            name: 'card-face-back',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: CardFaceBackScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/account/login',
+            name: 'account-login',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: AccountLoginScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/account/data',
+            name: 'account-data',
+            pageBuilder: (context, state) => const NoTransitionPage<void>(
+              child: AccountDataScreen(),
+            ),
+          ),
         ],
       ),
       GoRoute(
@@ -85,4 +123,4 @@ GoRouter createRouter() {
     ],
   );
 }
-
+
